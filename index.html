@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Is a Problem — Horde · Spineshatter EU</title>
+<meta name="description" content="Top-10 TBC Anniversary speed kill guild on Spineshatter EU. Rank #10 world. Recruiting exceptional players.">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topnav" id="topnav"></header>
+
+<div class="page">
+
+  <section class="hero">
+    <div>
+      <div class="hero-eyebrow">Spineshatter EU · Horde · TBC Anniversary</div>
+      <h1>IS A<br>PROBLEM</h1>
+      <p class="hero-sub">Speed-first raiding guild. Top-10 world speed kills. We don't farm — we improve.</p>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+        <a href="apply.html" class="btn btn-primary">Apply to Trial</a>
+        <a href="login.html" class="btn btn-outline">Member Login</a>
+      </div>
+    </div>
+    <div class="rank-block">
+      <div class="rank-num" id="hero-rank">#10</div>
+      <div class="rank-label">World Rank · Speed Kills</div>
+    </div>
+  </section>
+
+  <!-- PROGRESSION -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label">Progression</div>
+        <h2>The Hunt</h2>
+      </div>
+    </div>
+    <div id="prog-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+      <div class="empty">Loading…</div>
+    </div>
+  </section>
+
+  <!-- NEWS -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label">Dispatches</div>
+        <h2>News</h2>
+      </div>
+    </div>
+    <div id="news-list"><div class="empty">Loading…</div></div>
+  </section>
+
+  <!-- RECRUITMENT -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label">Recruitment</div>
+        <h2>Open Spots</h2>
+      </div>
+      <a href="apply.html" class="btn btn-primary">Apply →</a>
+    </div>
+    <div class="card card-flush" id="recruit-list"><div class="empty">Loading…</div></div>
+  </section>
+
+  <!-- OFFICERS -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label">Leadership</div>
+        <h2>The Council</h2>
+      </div>
+    </div>
+    <div id="officers-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.6rem;">
+      <div class="empty">Loading…</div>
+    </div>
+  </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  await loadSession();
+  renderNav('home');
+
+  // Progression
+  const { data: tiers } = await sb.from('progression')
+    .select('id, tier, raid_name, display_order, bosses(id,name,kill_time,display_order)')
+    .order('display_order');
+
+  const pg = document.getElementById('prog-grid');
+  if (!tiers || !tiers.length) {
+    pg.innerHTML = '<div class="empty">No progression data yet.</div>';
+  } else {
+    pg.innerHTML = tiers.map(t => {
+      const bosses = (t.bosses || []).sort((a,b) => a.display_order - b.display_order);
+      const cleared = bosses.filter(b => b.kill_time && b.kill_time !== 'in prog').length;
+      const pct = bosses.length ? Math.round((cleared/bosses.length)*100) : 0;
+      return `<div class="card">
+        <div class="label" style="margin-bottom:0.3rem;">${esc(t.tier)}</div>
+        <h3 style="margin-bottom:1rem;">${esc(t.raid_name)}</h3>
+        <div>
+          ${bosses.map(b => `
+            <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
+              <span style="color:var(--bone);">${esc(b.name)}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:${b.kill_time && b.kill_time!=='in prog'?'var(--accent)':'var(--dim)'};">${esc(b.kill_time||'—')}</span>
+            </div>`).join('')}
+        </div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:0.4rem;">
+          <span class="label">${cleared}/${bosses.length} bosses</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // News
+  const { data: news } = await sb.from('news').select('*').order('created_at', {ascending:false}).limit(6);
+  const nl = document.getElementById('news-list');
+  if (!news || !news.length) {
+    nl.innerHTML = '<div class="empty">No news yet.</div>';
+  } else {
+    nl.innerHTML = news.map(n => `
+      <div class="card card-accent">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.5rem;">
+          <h3>${esc(n.title)}</h3>
+          <span class="label">${esc(n.author_name)} · ${fmtDate(n.created_at)}</span>
+        </div>
+        <p style="white-space:pre-line;">${esc(n.body)}</p>
+      </div>`).join('');
+  }
+
+  // Recruitment
+  const { data: rec } = await sb.from('recruitment').select('*').order('priority').order('created_at');
+  const rl = document.getElementById('recruit-list');
+  if (!rec || !rec.length) {
+    rl.innerHTML = '<div class="empty">No open spots listed. Exceptional players always considered — <a href="apply.html">apply anyway</a>.</div>';
+  } else {
+    rl.innerHTML = rec.map(r => `
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <div style="color:var(--bone);font-weight:500;">${esc(r.class_name)}</div>
+          <div style="color:var(--dim);font-size:0.85rem;">${esc(r.spec_notes||'')}</div>
+        </div>
+        <span class="badge badge-${r.priority}">${r.priority}</span>
+      </div>`).join('');
+  }
+
+  // Officers
+  const { data: offs } = await sb.from('officers').select('*').order('display_order');
+  const ol = document.getElementById('officers-list');
+  if (!offs || !offs.length) {
+    ol.innerHTML = '<div class="empty">Leadership info coming soon.</div>';
+  } else {
+    ol.innerHTML = offs.map(o => `
+      <div class="card" style="text-align:center;padding:1.5rem 1rem;">
+        <div style="font-size:0.9rem;font-weight:500;color:var(--white);margin-bottom:0.2rem;">${esc(o.name)}</div>
+        <div class="label label-accent">${esc(o.title)}</div>
+        ${o.class_spec ? `<div style="color:var(--dim);font-size:0.82rem;margin-top:0.4rem;">${esc(o.class_spec)}</div>` : ''}
+      </div>`).join('');
+  }
+})();
+</script>
+</body>
+</html>

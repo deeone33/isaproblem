@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progression — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page">
+  <a href="dashboard.html" class="back">Dashboard</a>
+  <div class="label" style="margin-bottom:0.5rem;">Officer Tools</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:2rem;">
+    <h1>Progression</h1>
+    <button onclick="showAddTier()" class="btn btn-primary">+ Add Tier</button>
+  </div>
+
+  <!-- Add tier form -->
+  <div id="add-tier-form" class="card" style="display:none;margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:1rem;">New Raid Tier</h3>
+    <div class="col-2">
+      <div class="form-group">
+        <label class="form-label">Tier Label</label>
+        <input type="text" id="new-tier" placeholder="Tier 5">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Raid Name</label>
+        <input type="text" id="new-raid" placeholder="Serpentshrine Cavern">
+      </div>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+      <button onclick="addTier()" class="btn btn-primary btn-sm">Create Tier</button>
+      <button onclick="hideAddTier()" class="btn btn-outline btn-sm">Cancel</button>
+    </div>
+  </div>
+
+  <div id="tiers-list"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  if (!(await requireOfficer())) return;
+  renderNav('progression');
+  await loadTiers();
+})();
+
+async function loadTiers() {
+  const { data: tiers } = await sb.from('progression')
+    .select('id, tier, raid_name, display_order, bosses(id,name,kill_time,display_order)')
+    .order('display_order');
+
+  const el = document.getElementById('tiers-list');
+  if (!tiers?.length) { el.innerHTML = '<div class="empty">No tiers yet. Add one above.</div>'; return; }
+
+  el.innerHTML = tiers.map(t => {
+    const bosses = (t.bosses||[]).sort((a,b)=>a.display_order-b.display_order);
+    return `
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head">
+        <div>
+          <div class="label" style="margin-bottom:0.2rem;">${esc(t.tier)}</div>
+          <h3>${esc(t.raid_name)}</h3>
+        </div>
+        <div style="display:flex;gap:0.4rem;">
+          <button onclick="deleteTier('${t.id}')" class="btn btn-danger btn-sm">Delete Tier</button>
+        </div>
+      </div>
+
+      <div id="bosses-${t.id}">
+        ${bosses.map(b => `
+          <div class="row" style="justify-content:space-between;" id="brow-${b.id}">
+            <div style="display:flex;align-items:center;gap:1rem;flex:1;">
+              <input type="text" value="${esc(b.name)}" id="bname-${b.id}"
+                style="flex:1;background:transparent;border-color:transparent;padding:0.3rem 0.5rem;color:var(--bone);"
+                onblur="saveBoss('${b.id}')" onkeydown="if(event.key==='Enter')saveBoss('${b.id}')">
+              <input type="text" value="${esc(b.kill_time||'')}" id="btime-${b.id}"
+                placeholder="—" style="width:90px;background:transparent;border-color:transparent;padding:0.3rem 0.5rem;
+                font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--accent);text-align:right;"
+                onblur="saveBoss('${b.id}')" onkeydown="if(event.key==='Enter')saveBoss('${b.id}')">
+            </div>
+            <button onclick="deleteBoss('${b.id}','${t.id}')" class="btn btn-danger btn-sm" style="margin-left:0.5rem;">✕</button>
+          </div>`).join('')}
+      </div>
+
+      <!-- Add boss row -->
+      <div style="display:flex;gap:0.5rem;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <input type="text" id="nb-name-${t.id}" placeholder="Boss name" style="flex:1;">
+        <input type="text" id="nb-time-${t.id}" placeholder="Kill time" style="width:100px;font-family:'JetBrains Mono',monospace;">
+        <button onclick="addBoss('${t.id}')" class="btn btn-outline btn-sm">+ Add Boss</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function saveBoss(bossId) {
+  const name = document.getElementById(`bname-${bossId}`)?.value.trim();
+  const time = document.getElementById(`btime-${bossId}`)?.value.trim() || null;
+  if (!name) return;
+  const { error } = await sb.from('bosses').update({ name, kill_time: time }).eq('id', bossId);
+  if (error) toast(error.message, 'error');
+  else toast('Saved.', 'success');
+}
+
+async function addBoss(tierId) {
+  const name = document.getElementById(`nb-name-${tierId}`).value.trim();
+  const time = document.getElementById(`nb-time-${tierId}`).value.trim() || null;
+  if (!name) { toast('Boss name required.', 'error'); return; }
+  const { data: existing } = await sb.from('bosses').select('display_order').eq('progression_id', tierId).order('display_order', {ascending:false}).limit(1);
+  const nextOrder = (existing?.[0]?.display_order || 0) + 1;
+  const { error } = await sb.from('bosses').insert({ progression_id: tierId, name, kill_time: time, display_order: nextOrder });
+  if (error) { toast(error.message, 'error'); return; }
+  document.getElementById(`nb-name-${tierId}`).value = '';
+  document.getElementById(`nb-time-${tierId}`).value = '';
+  toast('Boss added.', 'success');
+  await loadTiers();
+}
+
+async function deleteBoss(bossId) {
+  if (!confirm('Remove this boss?')) return;
+  await sb.from('bosses').delete().eq('id', bossId);
+  toast('Removed.', 'success');
+  await loadTiers();
+}
+
+async function addTier() {
+  const tier = document.getElementById('new-tier').value.trim();
+  const raid = document.getElementById('new-raid').value.trim();
+  if (!tier || !raid) { toast('Both fields required.', 'error'); return; }
+  const { data: ex } = await sb.from('progression').select('display_order').order('display_order',{ascending:false}).limit(1);
+  const nextOrder = (ex?.[0]?.display_order || 0) + 1;
+  const { error } = await sb.from('progression').insert({ tier, raid_name: raid, display_order: nextOrder });
+  if (error) { toast(error.message, 'error'); return; }
+  document.getElementById('new-tier').value = '';
+  document.getElementById('new-raid').value = '';
+  hideAddTier();
+  toast('Tier added.', 'success');
+  await loadTiers();
+}
+
+async function deleteTier(tierId) {
+  if (!confirm('Delete this entire tier and all its bosses?')) return;
+  await sb.from('progression').delete().eq('id', tierId);
+  toast('Tier deleted.', 'success');
+  await loadTiers();
+}
+
+function showAddTier() { document.getElementById('add-tier-form').style.display = 'block'; }
+function hideAddTier() { document.getElementById('add-tier-form').style.display = 'none'; }
+</script>
+</body>
+</html>

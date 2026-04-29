@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Officers — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page-narrow">
+  <a href="dashboard.html" class="back">Dashboard</a>
+  <div class="label" style="margin-bottom:0.5rem;">Officer Tools</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:2rem;">
+    <h1>Officers</h1>
+    <button onclick="toggleAddForm()" class="btn btn-primary">+ Add Officer</button>
+  </div>
+
+  <p style="color:var(--dim);margin-bottom:2rem;font-size:0.9rem;">
+    This list controls the public Leadership section on the homepage. It's separate from site account roles — you can list officers here who aren't site members yet.
+  </p>
+
+  <div id="add-form" class="card" style="display:none;margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:1rem;">Add Officer</h3>
+    <div class="col-2">
+      <div class="form-group">
+        <label class="form-label">Character Name</label>
+        <input type="text" id="new-name" placeholder="Edenrath">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Title / Role</label>
+        <input type="text" id="new-title" placeholder="Guild Master">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Class & Spec <span style="color:var(--border);font-size:0.6rem;letter-spacing:0;">(optional)</span></label>
+      <input type="text" id="new-class" placeholder="Rogue · Combat">
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+      <button onclick="addOfficer()" class="btn btn-primary btn-sm">Add</button>
+      <button onclick="toggleAddForm()" class="btn btn-outline btn-sm">Cancel</button>
+    </div>
+  </div>
+
+  <div class="card card-flush" id="officer-list"><div class="empty">Loading…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  if (!(await requireOfficer())) return;
+  renderNav('officers');
+  await loadOfficers();
+})();
+
+async function loadOfficers() {
+  const { data } = await sb.from('officers').select('*').order('display_order');
+  const el = document.getElementById('officer-list');
+  if (!data?.length) { el.innerHTML = '<div class="empty">No officers listed yet.</div>'; return; }
+  el.innerHTML = data.map((o, i) => `
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:0.5rem;" id="orow-${o.id}">
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+          <div>
+            <input type="text" value="${esc(o.name)}" id="oname-${o.id}"
+              style="background:transparent;border-color:transparent;padding:0.2rem 0.4rem;color:var(--white);font-weight:500;width:160px;"
+              onblur="saveOfficer('${o.id}')" onkeydown="if(event.key==='Enter')saveOfficer('${o.id}')">
+            <input type="text" value="${esc(o.title)}" id="otitle-${o.id}"
+              style="background:transparent;border-color:transparent;padding:0.2rem 0.4rem;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:0.68rem;letter-spacing:0.2em;width:160px;"
+              onblur="saveOfficer('${o.id}')" onkeydown="if(event.key==='Enter')saveOfficer('${o.id}')">
+            <input type="text" value="${esc(o.class_spec||'')}" id="oclass-${o.id}"
+              placeholder="Class · Spec"
+              style="background:transparent;border-color:transparent;padding:0.2rem 0.4rem;color:var(--dim);font-size:0.82rem;width:160px;"
+              onblur="saveOfficer('${o.id}')" onkeydown="if(event.key==='Enter')saveOfficer('${o.id}')">
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.4rem;align-items:center;">
+        <button onclick="moveUp('${o.id}',${o.display_order})" class="btn btn-outline btn-sm" ${i===0?'disabled':''}>↑</button>
+        <button onclick="moveDown('${o.id}',${o.display_order},${data.length-1===i})" class="btn btn-outline btn-sm" ${i===data.length-1?'disabled':''}>↓</button>
+        <button onclick="deleteOfficer('${o.id}','${esc(o.name)}')" class="btn btn-danger btn-sm">Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+async function saveOfficer(id) {
+  const name       = document.getElementById(`oname-${id}`)?.value.trim();
+  const title      = document.getElementById(`otitle-${id}`)?.value.trim();
+  const class_spec = document.getElementById(`oclass-${id}`)?.value.trim() || null;
+  if (!name || !title) return;
+  const { error } = await sb.from('officers').update({ name, title, class_spec }).eq('id', id);
+  if (error) toast(error.message, 'error');
+  else toast('Saved.', 'success');
+}
+
+async function addOfficer() {
+  const name       = document.getElementById('new-name').value.trim();
+  const title      = document.getElementById('new-title').value.trim();
+  const class_spec = document.getElementById('new-class').value.trim() || null;
+  if (!name || !title) { toast('Name and title required.', 'error'); return; }
+  const { data: ex } = await sb.from('officers').select('display_order').order('display_order',{ascending:false}).limit(1);
+  const nextOrder = (ex?.[0]?.display_order || 0) + 1;
+  const { error } = await sb.from('officers').insert({ name, title, class_spec, display_order: nextOrder });
+  if (error) { toast(error.message, 'error'); return; }
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-class').value = '';
+  toggleAddForm();
+  toast('Officer added.', 'success');
+  await loadOfficers();
+}
+
+async function deleteOfficer(id, name) {
+  if (!confirm(`Remove ${name} from the officer list?`)) return;
+  await sb.from('officers').delete().eq('id', id);
+  toast('Removed.', 'success');
+  await loadOfficers();
+}
+
+async function moveUp(id, order) {
+  // Swap display_order with the row above
+  const { data: above } = await sb.from('officers').select('id,display_order').lt('display_order', order).order('display_order',{ascending:false}).limit(1);
+  if (!above?.length) return;
+  await sb.from('officers').update({ display_order: order }).eq('id', above[0].id);
+  await sb.from('officers').update({ display_order: above[0].display_order }).eq('id', id);
+  await loadOfficers();
+}
+
+async function moveDown(id, order) {
+  const { data: below } = await sb.from('officers').select('id,display_order').gt('display_order', order).order('display_order',{ascending:true}).limit(1);
+  if (!below?.length) return;
+  await sb.from('officers').update({ display_order: order }).eq('id', below[0].id);
+  await sb.from('officers').update({ display_order: below[0].display_order }).eq('id', id);
+  await loadOfficers();
+}
+
+function toggleAddForm() {
+  const f = document.getElementById('add-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roster — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page">
+  <a href="dashboard.html" class="back">Dashboard</a>
+  <div class="label" style="margin-bottom:0.5rem;">Guild</div>
+  <h1 style="margin-bottom:2rem;">Roster</h1>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Officers</h2>
+    </div>
+    <div id="officers-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.6rem;margin-bottom:2.5rem;">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Members</h2>
+      <span class="label" id="member-count"></span>
+    </div>
+    <div class="card card-flush" id="member-list"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  if (!(await requireMember())) return;
+  renderNav('roster');
+
+  // Officers display
+  const { data: offs } = await sb.from('officers').select('*').order('display_order');
+  const og = document.getElementById('officers-grid');
+  og.innerHTML = !offs?.length ? '<div class="empty">No officers listed.</div>' :
+    offs.map(o => `
+      <div class="card" style="text-align:center;padding:1.5rem 1rem;">
+        <div style="color:var(--white);font-weight:500;margin-bottom:0.2rem;">${esc(o.name)}</div>
+        <div class="label label-accent" style="margin-bottom:${o.class_spec?'0.3rem':'0'}">${esc(o.title)}</div>
+        ${o.class_spec ? `<div style="color:var(--dim);font-size:0.8rem;">${esc(o.class_spec)}</div>` : ''}
+      </div>`).join('');
+
+  // Members
+  await loadMembers();
+})();
+
+async function loadMembers() {
+  const { data: members } = await sb.from('profiles')
+    .select('*')
+    .in('role', ['member', 'officer'])
+    .order('role').order('username');
+
+  const ml = document.getElementById('member-list');
+  const count = document.getElementById('member-count');
+
+  if (!members?.length) { ml.innerHTML = '<div class="empty">No members yet.</div>'; return; }
+  count.textContent = `${members.length} members`;
+
+  ml.innerHTML = members.map(m => `
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:0.5rem;" id="row-${m.id}">
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <div>
+          <div style="color:var(--bone);font-weight:500;">${esc(m.username)}</div>
+          <div style="color:var(--dim);font-size:0.82rem;">${esc(m.character_class||'')}${m.character_spec?' · '+esc(m.character_spec):''}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.8rem;">
+        <span class="badge badge-${m.role}">${esc(m.rank||m.role)}</span>
+        ${isOfficer() ? `
+          <div style="display:flex;gap:0.4rem;">
+            ${m.role === 'member'
+              ? `<button onclick="promoteUser('${m.id}')" class="btn btn-outline btn-sm">Promote</button>`
+              : `<button onclick="demoteUser('${m.id}')" class="btn btn-outline btn-sm">Demote</button>`}
+            <button onclick="removeUser('${m.id}','${esc(m.username)}')" class="btn btn-danger btn-sm">Remove</button>
+          </div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+async function promoteUser(id) {
+  await sb.from('profiles').update({ role: 'officer', rank: 'Officer' }).eq('id', id);
+  toast('Promoted to officer.', 'success');
+  await loadMembers();
+}
+async function demoteUser(id) {
+  await sb.from('profiles').update({ role: 'member', rank: 'Raider' }).eq('id', id);
+  toast('Demoted to member.', 'success');
+  await loadMembers();
+}
+async function removeUser(id, name) {
+  if (!confirm(`Remove ${name} from the roster?`)) return;
+  await sb.from('profiles').update({ role: 'outsider', rank: 'Applicant' }).eq('id', id);
+  toast(`${name} removed.`, 'success');
+  await loadMembers();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Applications — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page">
+  <a href="dashboard.html" class="back">Dashboard</a>
+  <div class="label" style="margin-bottom:0.5rem;">Officer Tools</div>
+  <h1 style="margin-bottom:2rem;">Applications</h1>
+
+  <div style="display:flex;gap:0.5rem;margin-bottom:2rem;flex-wrap:wrap;" id="filter-btns">
+    <button onclick="setFilter('pending')"  class="btn btn-outline btn-sm active-filter" id="f-pending">Pending</button>
+    <button onclick="setFilter('accepted')" class="btn btn-outline btn-sm" id="f-accepted">Accepted</button>
+    <button onclick="setFilter('rejected')" class="btn btn-outline btn-sm" id="f-rejected">Rejected</button>
+    <button onclick="setFilter('all')"      class="btn btn-outline btn-sm" id="f-all">All</button>
+  </div>
+
+  <div id="app-list"><div class="empty">Loading…</div></div>
+</div>
+
+<style>
+.active-filter { border-color: var(--accent); color: var(--white); }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+let currentFilter = 'pending';
+
+(async () => {
+  if (!(await requireOfficer())) return;
+  renderNav('applications');
+  await loadApps();
+})();
+
+function setFilter(f) {
+  currentFilter = f;
+  ['pending','accepted','rejected','all'].forEach(x => {
+    document.getElementById(`f-${x}`)?.classList.toggle('active-filter', x === f);
+  });
+  loadApps();
+}
+
+async function loadApps() {
+  let query = sb.from('applications').select('*').order('submitted_at', {ascending:false});
+  if (currentFilter !== 'all') query = query.eq('status', currentFilter);
+  const { data, error } = await query;
+
+  const el = document.getElementById('app-list');
+  if (error) { el.innerHTML = `<div class="empty">${esc(error.message)}</div>`; return; }
+  if (!data?.length) { el.innerHTML = '<div class="empty">No applications.</div>'; return; }
+
+  el.innerHTML = data.map(a => `
+    <div class="card" style="margin-bottom:1rem;" id="app-${a.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+        <div>
+          <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;">
+            <h2 style="font-size:1.4rem;">${esc(a.applicant_name)}</h2>
+            <span class="badge badge-${a.status}">${a.status}</span>
+          </div>
+          <div style="color:var(--dim);font-size:0.85rem;margin-top:0.2rem;">
+            ${esc(a.character_class||'')}${a.character_spec?' · '+esc(a.character_spec):''}
+            ${a.age ? ' · Age '+esc(a.age) : ''}
+            · Discord: ${esc(a.discord_tag||'not provided')}
+            · ${fmtDateTime(a.submitted_at)}
+          </div>
+        </div>
+        ${a.status === 'pending' ? `
+          <div style="display:flex;gap:0.5rem;">
+            <button onclick="decide('${a.id}','accepted')" class="btn btn-ok btn-sm">Accept</button>
+            <button onclick="decide('${a.id}','rejected')" class="btn btn-danger btn-sm">Reject</button>
+          </div>` : `
+          <button onclick="resetApp('${a.id}')" class="btn btn-outline btn-sm">Reset to Pending</button>`}
+      </div>
+
+      <div style="display:grid;gap:0.8rem;">
+        ${a.logs_url ? `
+          <div>
+            <div class="label" style="margin-bottom:0.2rem;">Warcraft Logs</div>
+            <a href="${esc(a.logs_url)}" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;">${esc(a.logs_url)}</a>
+          </div>` : ''}
+        <div>
+          <div class="label" style="margin-bottom:0.2rem;">Raiding Experience</div>
+          <p style="white-space:pre-line;">${esc(a.experience)}</p>
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:0.2rem;">Expectations</div>
+          <p style="white-space:pre-line;">${esc(a.expectations)}</p>
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:0.2rem;">Why Is a Problem?</div>
+          <p style="white-space:pre-line;">${esc(a.why_join)}</p>
+        </div>
+        ${a.anything_else ? `
+          <div>
+            <div class="label" style="margin-bottom:0.2rem;">Additional Notes</div>
+            <p style="white-space:pre-line;">${esc(a.anything_else)}</p>
+          </div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+async function decide(id, status) {
+  const label = status === 'accepted' ? 'Accept' : 'Reject';
+  if (!confirm(`${label} this application?`)) return;
+
+  const { error } = await sb.from('applications')
+    .update({ status, reviewed_by: currentProfile.id })
+    .eq('id', id);
+
+  if (error) { toast(error.message, 'error'); return; }
+
+  // If accepted and they have a user_id, promote to member
+  if (status === 'accepted') {
+    const { data: app } = await sb.from('applications').select('user_id').eq('id', id).single();
+    if (app?.user_id) {
+      await sb.from('profiles').update({ role: 'member', rank: 'Trial' }).eq('id', app.user_id);
+      toast('Accepted — user promoted to Trial member.', 'success');
+    } else {
+      toast('Accepted — contact them on Discord to set up their account.', 'success');
+    }
+  } else {
+    toast('Application rejected.', 'success');
+  }
+
+  await loadApps();
+}
+
+async function resetApp(id) {
+  await sb.from('applications').update({ status: 'pending', reviewed_by: null }).eq('id', id);
+  toast('Reset to pending.', 'success');
+  await loadApps();
+}
+</script>
+</body>
+</html>

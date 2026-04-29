@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recruitment — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page-narrow">
+  <a href="dashboard.html" class="back">Dashboard</a>
+  <div class="label" style="margin-bottom:0.5rem;">Officer Tools</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:2rem;">
+    <h1>Recruitment</h1>
+    <button onclick="toggleAddForm()" class="btn btn-primary">+ Add Need</button>
+  </div>
+
+  <div id="add-form" class="card" style="display:none;margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:1rem;">New Recruitment Need</h3>
+    <div class="col-2">
+      <div class="form-group">
+        <label class="form-label">Class</label>
+        <input type="text" id="new-class" placeholder="Mage">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select id="new-priority">
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Spec / Notes</label>
+      <input type="text" id="new-spec" placeholder="Arcane / Fire — 2 spots">
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+      <button onclick="addNeed()" class="btn btn-primary btn-sm">Add</button>
+      <button onclick="toggleAddForm()" class="btn btn-outline btn-sm">Cancel</button>
+    </div>
+  </div>
+
+  <div class="card card-flush" id="recruit-list"><div class="empty">Loading…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  if (!(await requireOfficer())) return;
+  renderNav('recruitment');
+  await loadNeeds();
+})();
+
+async function loadNeeds() {
+  const { data } = await sb.from('recruitment').select('*').order('priority').order('created_at');
+  const el = document.getElementById('recruit-list');
+  if (!data?.length) { el.innerHTML = '<div class="empty">No recruitment needs listed.</div>'; return; }
+  el.innerHTML = data.map(r => `
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+      <div>
+        <div style="color:var(--bone);font-weight:500;">${esc(r.class_name)}</div>
+        <div style="color:var(--dim);font-size:0.82rem;">${esc(r.spec_notes||'')}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.8rem;">
+        <select onchange="updatePriority('${r.id}',this.value)" class="btn btn-outline btn-sm" style="padding:0.3rem 0.5rem;font-size:0.6rem;">
+          <option value="high"  ${r.priority==='high'?'selected':''}>High</option>
+          <option value="medium"${r.priority==='medium'?'selected':''}>Medium</option>
+          <option value="low"   ${r.priority==='low'?'selected':''}>Low</option>
+        </select>
+        <button onclick="deleteNeed('${r.id}')" class="btn btn-danger btn-sm">Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+async function addNeed() {
+  const class_name = document.getElementById('new-class').value.trim();
+  const spec_notes = document.getElementById('new-spec').value.trim();
+  const priority   = document.getElementById('new-priority').value;
+  if (!class_name) { toast('Class name required.', 'error'); return; }
+  const { error } = await sb.from('recruitment').insert({ class_name, spec_notes, priority });
+  if (error) { toast(error.message, 'error'); return; }
+  document.getElementById('new-class').value = '';
+  document.getElementById('new-spec').value = '';
+  toggleAddForm();
+  toast('Added.', 'success');
+  await loadNeeds();
+}
+
+async function updatePriority(id, priority) {
+  await sb.from('recruitment').update({ priority }).eq('id', id);
+  toast('Updated.', 'success');
+  await loadNeeds();
+}
+
+async function deleteNeed(id) {
+  if (!confirm('Remove this recruitment need?')) return;
+  await sb.from('recruitment').delete().eq('id', id);
+  toast('Removed.', 'success');
+  await loadNeeds();
+}
+
+function toggleAddForm() {
+  const f = document.getElementById('add-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>

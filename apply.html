@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apply — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page-narrow">
+  <a href="index.html" class="back">Home</a>
+  <div class="label" style="margin-bottom:0.5rem;">Trial Application</div>
+  <h1 style="margin-bottom:0.5rem;">Apply</h1>
+  <p style="color:var(--dim);margin-bottom:2.5rem;">Officers review within 48 hours. You'll be notified here if you login with Discord — or we'll reach out to you directly.</p>
+
+  <form id="apply-form" class="card" style="padding:2rem;">
+
+    <div class="col-2">
+      <div class="form-group">
+        <label class="form-label" for="char_name">Character Name *</label>
+        <input type="text" id="char_name" required placeholder="Edenrath">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="discord_tag">Discord Tag *</label>
+        <input type="text" id="discord_tag" required placeholder="username#0000">
+      </div>
+    </div>
+
+    <div class="col-3">
+      <div class="form-group">
+        <label class="form-label" for="char_class">Class *</label>
+        <input type="text" id="char_class" required placeholder="Rogue">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="char_spec">Spec *</label>
+        <input type="text" id="char_spec" required placeholder="Combat">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="age">Age <span class="optional">(optional)</span></label>
+        <input type="number" id="age" min="13" max="80" placeholder="—">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="logs_url">Warcraft Logs URL</label>
+      <input type="url" id="logs_url" placeholder="https://www.warcraftlogs.com/character/eu/spineshatter/...">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="experience">Raiding Experience *</label>
+      <textarea id="experience" rows="4" required placeholder="Previous guilds, notable kills, years of experience…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="expectations">What are your expectations from the guild? *</label>
+      <textarea id="expectations" rows="3" required placeholder="What do you want from being in a top-10 guild?"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="why_join">Why Is a Problem? *</label>
+      <textarea id="why_join" rows="3" required placeholder="Why us specifically?"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="anything_else">Anything else? <span class="optional">(optional)</span></label>
+      <textarea id="anything_else" rows="2" placeholder="Alts, availability notes, anything you want us to know…"></textarea>
+    </div>
+
+    <div style="display:flex;gap:1rem;margin-top:0.5rem;">
+      <a href="index.html" class="btn btn-outline">Cancel</a>
+      <button type="submit" class="btn btn-primary">Submit Application →</button>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  await loadSession();
+  renderNav('apply');
+})();
+
+document.getElementById('apply-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('[type=submit]');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const payload = {
+    applicant_name:  document.getElementById('char_name').value.trim(),
+    discord_tag:     document.getElementById('discord_tag').value.trim(),
+    character_class: document.getElementById('char_class').value.trim(),
+    character_spec:  document.getElementById('char_spec').value.trim(),
+    age:             document.getElementById('age').value || null,
+    logs_url:        document.getElementById('logs_url').value.trim() || null,
+    experience:      document.getElementById('experience').value.trim(),
+    expectations:    document.getElementById('expectations').value.trim(),
+    why_join:        document.getElementById('why_join').value.trim(),
+    anything_else:   document.getElementById('anything_else').value.trim() || null,
+    user_id:         currentUser?.id || null,
+  };
+
+  const { error } = await sb.from('applications').insert(payload);
+  if (error) {
+    toast(error.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Submit Application →';
+    return;
+  }
+
+  // Replace form with confirmation
+  document.getElementById('apply-form').innerHTML = `
+    <div style="text-align:center;padding:2rem 0;">
+      <div style="font-size:2rem;margin-bottom:1rem;">✓</div>
+      <h2 style="margin-bottom:0.8rem;">Application Submitted</h2>
+      <p style="color:var(--dim);margin-bottom:2rem;">Officers will review your application within 48 hours. If you log in with Discord, you can track the status on your dashboard.</p>
+      <a href="index.html" class="btn btn-outline">Back to Home</a>
+    </div>
+  `;
+});
+</script>
+</body>
+</html>

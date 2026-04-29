@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page">
+  <div id="page-head" style="margin-bottom:2.5rem;"></div>
+  <div id="alerts"></div>
+
+  <!-- Applicant status banner (shown if outsider with application) -->
+  <div id="app-status"></div>
+
+  <div class="grid-2" id="main-layout">
+    <div>
+      <!-- News section -->
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="label">Dispatches</div>
+            <h2>News</h2>
+          </div>
+          <button id="btn-new-post" class="btn btn-outline btn-sm" style="display:none;" onclick="togglePostForm()">+ Post</button>
+        </div>
+
+        <div id="post-form" class="card card-accent" style="display:none;margin-bottom:1rem;">
+          <div class="form-group">
+            <label class="form-label">Title</label>
+            <input type="text" id="post-title" placeholder="Post title">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Body</label>
+            <textarea id="post-body" rows="5" placeholder="Write your dispatch…"></textarea>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button onclick="publishPost()" class="btn btn-primary btn-sm">Publish</button>
+            <button onclick="togglePostForm()" class="btn btn-outline btn-sm">Cancel</button>
+          </div>
+        </div>
+
+        <div id="news-list"></div>
+      </section>
+    </div>
+
+    <div>
+      <!-- Quick links sidebar -->
+      <section class="section">
+        <div class="section-head">
+          <div class="label" style="padding-bottom:0;">Quick Access</div>
+        </div>
+        <div id="quick-links"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  await loadSession();
+  if (!isLoggedIn()) { window.location.href = 'login.html'; return; }
+  renderNav('dashboard');
+
+  document.getElementById('page-head').innerHTML = `
+    <div class="label" style="margin-bottom:0.4rem;">${isOfficer() ? 'Officer Hall' : isMember() ? 'Member Hall' : 'Applicant Hall'}</div>
+    <h1>Welcome, ${esc(currentProfile?.username || 'Adventurer')}</h1>
+  `;
+
+  // Officer alerts
+  if (isOfficer()) {
+    const { count } = await sb.from('applications').select('*', {count:'exact',head:true}).eq('status','pending');
+    if (count > 0) {
+      document.getElementById('alerts').innerHTML = `
+        <div class="card card-warn" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <div class="label" style="color:var(--warn);margin-bottom:0.2rem;">Pending Review</div>
+            <div>${count} application${count!==1?'s':''} awaiting officer decision</div>
+          </div>
+          <a href="applications.html" class="btn btn-outline btn-sm">Review →</a>
+        </div>`;
+    }
+    document.getElementById('btn-new-post').style.display = 'inline-flex';
+  }
+
+  // If outsider — show their application status
+  if (!isMember()) {
+    const { data: myApp } = await sb.from('applications')
+      .select('status, submitted_at, applicant_name')
+      .eq('user_id', currentUser.id)
+      .order('submitted_at', {ascending:false})
+      .limit(1)
+      .single();
+    if (myApp) {
+      const statusColor = myApp.status === 'accepted' ? 'var(--ok)' : myApp.status === 'rejected' ? 'var(--danger)' : 'var(--warn)';
+      document.getElementById('app-status').innerHTML = `
+        <div class="card" style="margin-bottom:2rem;border-color:${statusColor};">
+          <div class="label" style="margin-bottom:0.4rem;">Your Application</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+            <div>
+              <div style="color:var(--bone);font-weight:500;">${esc(myApp.applicant_name)}</div>
+              <div style="color:var(--dim);font-size:0.82rem;">Submitted ${fmtDate(myApp.submitted_at)}</div>
+            </div>
+            <span class="badge badge-${myApp.status}">${myApp.status}</span>
+          </div>
+          ${myApp.status === 'accepted' ? '<p style="margin-top:0.8rem;color:var(--ok);">Congratulations! An officer will be in touch to complete your setup.</p>' : ''}
+          ${myApp.status === 'rejected' ? '<p style="margin-top:0.8rem;color:var(--dim);">We\'re sorry, your application wasn\'t successful this time. Feel free to reach out on Discord for feedback.</p>' : ''}
+          ${myApp.status === 'pending' ? '<p style="margin-top:0.8rem;color:var(--dim);">Under review — officers will reach out via Discord once a decision is made.</p>' : ''}
+        </div>`;
+    } else {
+      document.getElementById('app-status').innerHTML = `
+        <div class="card" style="margin-bottom:2rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+            <div>
+              <div style="color:var(--bone);">No application on file</div>
+              <div style="color:var(--dim);font-size:0.82rem;">Interested in joining the guild?</div>
+            </div>
+            <a href="apply.html" class="btn btn-primary btn-sm">Apply Now →</a>
+          </div>
+        </div>`;
+    }
+  }
+
+  // Quick links
+  const links = [];
+  if (isMember()) {
+    links.push({ href: 'roster.html', label: 'Roster', desc: 'View guild members' });
+  }
+  if (isOfficer()) {
+    links.push({ href: 'progression.html', label: 'Edit Progression', desc: 'Update kill times' });
+    links.push({ href: 'recruitment.html', label: 'Recruitment', desc: 'Manage class needs' });
+    links.push({ href: 'applications.html', label: 'Applications', desc: 'Review trials' });
+    links.push({ href: 'officers.html', label: 'Officers', desc: 'Manage leadership' });
+    links.push({ href: 'roster.html', label: 'Roster', desc: 'Manage members' });
+  }
+  if (!isMember()) {
+    links.push({ href: 'apply.html', label: 'Apply', desc: 'Submit your application' });
+  }
+
+  const ql = document.getElementById('quick-links');
+  ql.innerHTML = links.length ? links.map(l => `
+    <a href="${l.href}" class="card" style="display:block;text-decoration:none;color:inherit;margin-bottom:0.5rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="color:var(--white);font-weight:500;">${l.label}</div>
+          <div style="color:var(--dim);font-size:0.82rem;">${l.desc}</div>
+        </div>
+        <span style="color:var(--dim);">→</span>
+      </div>
+    </a>`).join('') : '<div class="empty">No quick links available.</div>';
+
+  await loadNews();
+})();
+
+async function loadNews() {
+  const { data } = await sb.from('news').select('*').order('created_at',{ascending:false}).limit(15);
+  const el = document.getElementById('news-list');
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">No news yet.</div>'; return; }
+  el.innerHTML = data.map(n => `
+    <div class="card card-accent" style="position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+        <h3>${esc(n.title)}</h3>
+        <span class="label">${esc(n.author_name)} · ${fmtDate(n.created_at)}</span>
+      </div>
+      <p style="white-space:pre-line;">${esc(n.body)}</p>
+      ${isOfficer() ? `<button onclick="deletePost('${n.id}')" class="btn btn-danger btn-sm" style="position:absolute;top:1rem;right:1rem;">Delete</button>` : ''}
+    </div>`).join('');
+}
+
+function togglePostForm() {
+  const f = document.getElementById('post-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function publishPost() {
+  const title = document.getElementById('post-title').value.trim();
+  const body  = document.getElementById('post-body').value.trim();
+  if (!title || !body) { toast('Title and body required.', 'error'); return; }
+  const { error } = await sb.from('news').insert({ title, body, author_id: currentProfile.id, author_name: currentProfile.username });
+  if (error) { toast(error.message, 'error'); return; }
+  document.getElementById('post-title').value = '';
+  document.getElementById('post-body').value = '';
+  togglePostForm();
+  toast('Posted.', 'success');
+  await loadNews();
+}
+
+async function deletePost(id) {
+  if (!confirm('Delete this post?')) return;
+  await sb.from('news').delete().eq('id', id);
+  toast('Deleted.', 'success');
+  await loadNews();
+}
+</script>
+</body>
+</html>
