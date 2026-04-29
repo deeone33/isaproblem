@@ -13,12 +13,77 @@
 <div class="page">
   <a href="dashboard.html" class="back">Dashboard</a>
   <div class="label" style="margin-bottom:0.5rem;">Officer Tools</div>
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:2rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:0.5rem;">
     <h1>Progression</h1>
-    <button onclick="showAddTier()" class="btn btn-primary">+ Add Tier</button>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <button onclick="showWclSync()" class="btn btn-outline">⟳ Sync from WCL</button>
+      <button onclick="showAddTier()" class="btn btn-primary">+ Add Tier</button>
+    </div>
+  </div>
+  <p style="color:var(--dim);margin-bottom:2rem;font-size:0.85rem;">Click any boss name or kill time to edit inline. Press Enter or click away to save.</p>
+
+  <!-- WCL SYNC PANEL -->
+  <div id="wcl-panel" class="card" style="display:none;margin-bottom:1.5rem;border-color:var(--accent);">
+    <h3 style="margin-bottom:0.5rem;">Sync from Warcraft Logs</h3>
+    <p style="color:var(--dim);font-size:0.85rem;margin-bottom:1.2rem;">
+      Fetches your guild's fastest kill times from WCL and updates the progression table. Only raids with at least one kill will appear. You can still edit manually after syncing.
+    </p>
+
+    <div id="wcl-setup">
+      <div class="col-2" style="margin-bottom:1rem;">
+        <div class="form-group">
+          <label class="form-label">WCL Client ID</label>
+          <input type="text" id="wcl-client-id" placeholder="Paste your WCL Client ID">
+        </div>
+        <div class="form-group">
+          <label class="form-label">WCL Client Secret</label>
+          <input type="password" id="wcl-client-secret" placeholder="Paste your WCL Client Secret">
+        </div>
+      </div>
+      <div class="col-3" style="margin-bottom:1rem;">
+        <div class="form-group">
+          <label class="form-label">Guild Name</label>
+          <input type="text" id="wcl-guild" value="Is a Problem">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Server</label>
+          <input type="text" id="wcl-server" value="Spineshatter">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Region</label>
+          <select id="wcl-region">
+            <option value="EU" selected>EU</option>
+            <option value="US">US</option>
+            <option value="KR">KR</option>
+            <option value="TW">TW</option>
+          </select>
+        </div>
+      </div>
+      <p style="color:var(--dim);font-size:0.78rem;margin-bottom:1rem;">
+        Get credentials at <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>. These are used only in your browser and never stored.
+      </p>
+      <div style="display:flex;gap:0.5rem;">
+        <button onclick="runWclSync()" class="btn btn-primary" id="wcl-sync-btn">Fetch from WCL</button>
+        <button onclick="hideWclSync()" class="btn btn-outline">Cancel</button>
+      </div>
+    </div>
+
+    <div id="wcl-progress" style="display:none;margin-top:1rem;">
+      <div id="wcl-log" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--dim);line-height:2;"></div>
+    </div>
+
+    <div id="wcl-preview" style="display:none;margin-top:1.5rem;">
+      <hr style="margin-bottom:1.5rem;">
+      <h3 style="margin-bottom:0.8rem;">Preview — confirm before saving</h3>
+      <div id="wcl-preview-content"></div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+        <button onclick="confirmWclSync()" class="btn btn-primary">Save to Database</button>
+        <button onclick="hideWclSync()" class="btn btn-outline">Discard</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Add tier form -->
+  <!-- ADD TIER FORM -->
   <div id="add-tier-form" class="card" style="display:none;margin-bottom:1.5rem;">
     <h3 style="margin-bottom:1rem;">New Raid Tier</h3>
     <div class="col-2">
@@ -43,6 +108,209 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 <script>
+// TBC raid structure for mapping WCL boss names
+const WCL_RAID_MAP = {
+  'Karazhan':              { tier:'Tier 4', bosses:['Attumen the Huntsman','Moroes','Maiden of Virtue','Opera Hall','The Curator','Terestian Illhoof','Shade of Aran','Netherspite','Chess Event','Prince Malchezaar','Nightbane'] },
+  "Gruul's Lair":          { tier:'Tier 4', bosses:['High King Maulgar','Gruul the Dragonkiller'] },
+  "Magtheridon's Lair":    { tier:'Tier 4', bosses:['Magtheridon'] },
+  'Serpentshrine Cavern':  { tier:'Tier 5', bosses:['Hydross the Unstable','The Lurker Below','Leotheras the Blind','Fathom-Lord Karathress','Morogrim Tidewalker','Lady Vashj'] },
+  'Tempest Keep':          { tier:'Tier 5', bosses:["Al'ar",'Void Reaver','High Astromancer Solarian',"Kael'thas Sunstrider"] },
+  'Battle for Mount Hyjal':{ tier:'Tier 6', bosses:['Rage Winterchill','Anetheron',"Kaz'rogal",'Azgalor','Archimonde'] },
+  'Black Temple':          { tier:'Tier 6', bosses:["High Warlord Naj'entus",'Supremus','Shade of Akama','Teron Gorefiend','Gurtogg Bloodboil','Reliquary of Souls','Mother Shahraz','The Illidari Council','Illidan Stormrage'] },
+  "Zul'Aman":              { tier:'Tier 6', bosses:['Nalorakk',"Akil'zon","Jan'alai",'Halazzi','Hex Lord Malacrass',"Zul'jin"] },
+  'Sunwell Plateau':       { tier:'Tier 6', bosses:['Kalecgos','Brutallus','Felmyst','The Eredar Twins',"M'uru","Kil'jaeden"] },
+};
+
+let wclData = null;
+
+function wclLog(msg) {
+  document.getElementById('wcl-log').innerHTML += msg + '<br>';
+}
+
+function formatMs(ms) {
+  if (!ms) return null;
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+async function getWclToken(id, secret) {
+  const r = await fetch('https://www.warcraftlogs.com/oauth/token', {
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body: new URLSearchParams({ grant_type:'client_credentials', client_id:id, client_secret:secret })
+  });
+  if (!r.ok) throw new Error('Auth failed — check Client ID and Secret');
+  return (await r.json()).access_token;
+}
+
+async function wclQuery(token, query, variables={}) {
+  const r = await fetch('https://www.warcraftlogs.com/api/v2/client', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+    body: JSON.stringify({query, variables})
+  });
+  if (!r.ok) throw new Error(`WCL API error ${r.status}`);
+  return r.json();
+}
+
+async function runWclSync() {
+  const clientId     = document.getElementById('wcl-client-id').value.trim();
+  const clientSecret = document.getElementById('wcl-client-secret').value.trim();
+  const guild        = document.getElementById('wcl-guild').value.trim();
+  const server       = document.getElementById('wcl-server').value.trim();
+  const region       = document.getElementById('wcl-region').value;
+
+  if (!clientId || !clientSecret) { toast('Client ID and Secret required.', 'error'); return; }
+
+  document.getElementById('wcl-setup').style.display = 'none';
+  document.getElementById('wcl-progress').style.display = 'block';
+  document.getElementById('wcl-preview').style.display = 'none';
+  document.getElementById('wcl-log').innerHTML = '';
+  wclData = null;
+
+  try {
+    wclLog('Authenticating…');
+    const token = await getWclToken(clientId, clientSecret);
+    wclLog('✓ Authenticated');
+
+    wclLog(`Fetching reports for <strong style="color:var(--bone)">${esc(guild)}</strong> — ${esc(server)} ${region}…`);
+
+    const { data, errors } = await wclQuery(token, `
+      query($name:String!,$slug:String!,$region:String!) {
+        guildData {
+          guild(name:$name,serverSlug:$slug,serverRegion:$region) {
+            name
+            reports(limit:50) {
+              data {
+                code
+                fights(killType:Kills) {
+                  name
+                  kill
+                  startTime
+                  endTime
+                }
+              }
+            }
+          }
+        }
+      }`, { name:guild, slug:server.toLowerCase(), region });
+
+    if (errors) throw new Error(errors[0].message);
+    const guildObj = data?.guildData?.guild;
+    if (!guildObj) throw new Error('Guild not found. Check name, server, and region — make sure your logs are set to public.');
+
+    wclLog(`✓ Guild found: <strong style="color:var(--bone)">${esc(guildObj.name)}</strong>`);
+
+    const reports = guildObj.reports?.data || [];
+    wclLog(`Scanning ${reports.length} reports for kills…`);
+
+    // Build best kill times per boss
+    const best = {};
+    for (const report of reports) {
+      for (const fight of (report.fights||[])) {
+        if (!fight.kill) continue;
+        const dur = fight.endTime - fight.startTime;
+        if (!best[fight.name] || dur < best[fight.name]) best[fight.name] = dur;
+      }
+    }
+
+    const killCount = Object.keys(best).length;
+    wclLog(`✓ Found ${killCount} unique boss kills across all reports`);
+
+    // Map to raid structure
+    const result = [];
+    for (const [raidName, raidInfo] of Object.entries(WCL_RAID_MAP)) {
+      const mapped = raidInfo.bosses.map(bossName => {
+        // Exact match
+        let ms = best[bossName];
+        // Fuzzy match — first word
+        if (!ms) {
+          const firstWord = bossName.split(' ')[0].toLowerCase();
+          const match = Object.keys(best).find(k => k.toLowerCase().startsWith(firstWord));
+          if (match) ms = best[match];
+        }
+        return { name:bossName, kill_time: formatMs(ms), killed:!!ms };
+      });
+
+      if (mapped.some(b => b.killed)) {
+        result.push({ tier:raidInfo.tier, raid_name:raidName, bosses:mapped });
+        wclLog(`✓ ${raidName}: ${mapped.filter(b=>b.killed).length}/${mapped.length} killed`);
+      }
+    }
+
+    if (!result.length) {
+      wclLog('<span style="color:var(--warn)">⚠ No TBC kills found. Are logs set to public?</span>');
+      document.getElementById('wcl-setup').style.display = 'block';
+      return;
+    }
+
+    wclData = result;
+    document.getElementById('wcl-preview').style.display = 'block';
+    document.getElementById('wcl-preview-content').innerHTML = result.map(r => `
+      <div class="card" style="margin-bottom:0.6rem;">
+        <div class="label" style="margin-bottom:0.2rem;">${esc(r.tier)}</div>
+        <h3 style="margin-bottom:0.6rem;">${esc(r.raid_name)}</h3>
+        ${r.bosses.map(b=>`
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+            <span style="color:${b.killed?'var(--bone)':'var(--dim)'};">${esc(b.name)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:${b.killed?'var(--accent)':'var(--dim)'};">${b.kill_time||'—'}</span>
+          </div>`).join('')}
+      </div>`).join('');
+
+    wclLog('Done — review the preview and confirm to save to database.');
+
+  } catch(err) {
+    wclLog(`<span style="color:var(--danger)">✗ ${esc(err.message)}</span>`);
+    document.getElementById('wcl-setup').style.display = 'block';
+  }
+}
+
+async function confirmWclSync() {
+  if (!wclData) return;
+  const btn = document.querySelector('#wcl-preview button');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    // Wipe existing and replace
+    await sb.from('bosses').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    await sb.from('progression').delete().neq('id','00000000-0000-0000-0000-000000000000');
+
+    for (let i = 0; i < wclData.length; i++) {
+      const t = wclData[i];
+      const { data:newTier, error:te } = await sb.from('progression')
+        .insert({ tier:t.tier, raid_name:t.raid_name, display_order:i+1 })
+        .select().single();
+      if (te) throw te;
+
+      const { error:be } = await sb.from('bosses').insert(
+        t.bosses.map((b,j) => ({ progression_id:newTier.id, name:b.name, kill_time:b.kill_time||null, display_order:j+1 }))
+      );
+      if (be) throw be;
+    }
+
+    toast('Synced from WCL successfully!', 'success');
+    hideWclSync();
+    await loadTiers();
+  } catch(err) {
+    toast('Save failed: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Save to Database';
+  }
+}
+
+function showWclSync() {
+  document.getElementById('wcl-panel').style.display = 'block';
+  document.getElementById('wcl-setup').style.display = 'block';
+  document.getElementById('wcl-progress').style.display = 'none';
+  document.getElementById('wcl-preview').style.display = 'none';
+}
+function hideWclSync() {
+  document.getElementById('wcl-panel').style.display = 'none';
+  wclData = null;
+}
+
+// ---- MANUAL TIER/BOSS MANAGEMENT ----
 (async () => {
   if (!(await requireOfficer())) return;
   renderNav('progression');
@@ -50,107 +318,101 @@
 })();
 
 async function loadTiers() {
-  const { data: tiers } = await sb.from('progression')
-    .select('id, tier, raid_name, display_order, bosses(id,name,kill_time,display_order)')
+  const { data:tiers } = await sb.from('progression')
+    .select('id,tier,raid_name,display_order,bosses(id,name,kill_time,display_order)')
     .order('display_order');
 
   const el = document.getElementById('tiers-list');
-  if (!tiers?.length) { el.innerHTML = '<div class="empty">No tiers yet. Add one above.</div>'; return; }
+  if (!tiers?.length) { el.innerHTML = '<div class="empty">No tiers yet. Sync from WCL or add manually.</div>'; return; }
 
   el.innerHTML = tiers.map(t => {
     const bosses = (t.bosses||[]).sort((a,b)=>a.display_order-b.display_order);
+    const cleared = bosses.filter(b=>b.kill_time).length;
+    const pct = bosses.length ? Math.round((cleared/bosses.length)*100) : 0;
     return `
     <div class="card" style="margin-bottom:1rem;">
       <div class="card-head">
         <div>
           <div class="label" style="margin-bottom:0.2rem;">${esc(t.tier)}</div>
-          <h3>${esc(t.raid_name)}</h3>
+          <h3>${esc(t.raid_name)} <span style="color:var(--dim);font-size:0.78rem;font-weight:300;">${cleared}/${bosses.length}</span></h3>
         </div>
-        <div style="display:flex;gap:0.4rem;">
-          <button onclick="deleteTier('${t.id}')" class="btn btn-danger btn-sm">Delete Tier</button>
-        </div>
+        <button onclick="deleteTier('${t.id}')" class="btn btn-danger btn-sm">Delete</button>
       </div>
-
+      <div class="prog-bar" style="margin-bottom:1rem;"><div class="prog-fill" style="width:${pct}%"></div></div>
       <div id="bosses-${t.id}">
-        ${bosses.map(b => `
+        ${bosses.map(b=>`
           <div class="row" style="justify-content:space-between;" id="brow-${b.id}">
-            <div style="display:flex;align-items:center;gap:1rem;flex:1;">
+            <div style="display:flex;align-items:center;flex:1;gap:0.5rem;">
               <input type="text" value="${esc(b.name)}" id="bname-${b.id}"
-                style="flex:1;background:transparent;border-color:transparent;padding:0.3rem 0.5rem;color:var(--bone);"
-                onblur="saveBoss('${b.id}')" onkeydown="if(event.key==='Enter')saveBoss('${b.id}')">
+                style="flex:1;background:transparent;border:1px solid transparent;padding:0.25rem 0.4rem;color:var(--bone);"
+                onfocus="this.style.borderColor='var(--border)'"
+                onblur="this.style.borderColor='transparent';saveBoss('${b.id}')"
+                onkeydown="if(event.key==='Enter')this.blur()">
               <input type="text" value="${esc(b.kill_time||'')}" id="btime-${b.id}"
-                placeholder="—" style="width:90px;background:transparent;border-color:transparent;padding:0.3rem 0.5rem;
-                font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--accent);text-align:right;"
-                onblur="saveBoss('${b.id}')" onkeydown="if(event.key==='Enter')saveBoss('${b.id}')">
+                placeholder="not killed"
+                style="width:100px;background:transparent;border:1px solid transparent;padding:0.25rem 0.4rem;
+                font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--accent);text-align:right;"
+                onfocus="this.style.borderColor='var(--border)'"
+                onblur="this.style.borderColor='transparent';saveBoss('${b.id}')"
+                onkeydown="if(event.key==='Enter')this.blur()">
             </div>
-            <button onclick="deleteBoss('${b.id}','${t.id}')" class="btn btn-danger btn-sm" style="margin-left:0.5rem;">✕</button>
+            <button onclick="deleteBoss('${b.id}')" class="btn btn-danger btn-sm" style="margin-left:0.5rem;">✕</button>
           </div>`).join('')}
       </div>
-
-      <!-- Add boss row -->
       <div style="display:flex;gap:0.5rem;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
         <input type="text" id="nb-name-${t.id}" placeholder="Boss name" style="flex:1;">
-        <input type="text" id="nb-time-${t.id}" placeholder="Kill time" style="width:100px;font-family:'JetBrains Mono',monospace;">
-        <button onclick="addBoss('${t.id}')" class="btn btn-outline btn-sm">+ Add Boss</button>
+        <input type="text" id="nb-time-${t.id}" placeholder="e.g. 3:42" style="width:100px;font-family:'JetBrains Mono',monospace;">
+        <button onclick="addBoss('${t.id}')" class="btn btn-outline btn-sm">+ Boss</button>
       </div>
     </div>`;
   }).join('');
 }
 
-async function saveBoss(bossId) {
-  const name = document.getElementById(`bname-${bossId}`)?.value.trim();
-  const time = document.getElementById(`btime-${bossId}`)?.value.trim() || null;
+async function saveBoss(id) {
+  const name = document.getElementById(`bname-${id}`)?.value.trim();
+  const time = document.getElementById(`btime-${id}`)?.value.trim()||null;
   if (!name) return;
-  const { error } = await sb.from('bosses').update({ name, kill_time: time }).eq('id', bossId);
-  if (error) toast(error.message, 'error');
-  else toast('Saved.', 'success');
+  const {error} = await sb.from('bosses').update({name,kill_time:time}).eq('id',id);
+  if (error) toast(error.message,'error');
 }
 
 async function addBoss(tierId) {
   const name = document.getElementById(`nb-name-${tierId}`).value.trim();
-  const time = document.getElementById(`nb-time-${tierId}`).value.trim() || null;
-  if (!name) { toast('Boss name required.', 'error'); return; }
-  const { data: existing } = await sb.from('bosses').select('display_order').eq('progression_id', tierId).order('display_order', {ascending:false}).limit(1);
-  const nextOrder = (existing?.[0]?.display_order || 0) + 1;
-  const { error } = await sb.from('bosses').insert({ progression_id: tierId, name, kill_time: time, display_order: nextOrder });
-  if (error) { toast(error.message, 'error'); return; }
-  document.getElementById(`nb-name-${tierId}`).value = '';
-  document.getElementById(`nb-time-${tierId}`).value = '';
-  toast('Boss added.', 'success');
+  const time = document.getElementById(`nb-time-${tierId}`).value.trim()||null;
+  if (!name) { toast('Boss name required.','error'); return; }
+  const {data:ex} = await sb.from('bosses').select('display_order').eq('progression_id',tierId).order('display_order',{ascending:false}).limit(1);
+  await sb.from('bosses').insert({progression_id:tierId,name,kill_time:time,display_order:(ex?.[0]?.display_order||0)+1});
+  document.getElementById(`nb-name-${tierId}`).value='';
+  document.getElementById(`nb-time-${tierId}`).value='';
   await loadTiers();
 }
 
-async function deleteBoss(bossId) {
+async function deleteBoss(id) {
   if (!confirm('Remove this boss?')) return;
-  await sb.from('bosses').delete().eq('id', bossId);
-  toast('Removed.', 'success');
+  await sb.from('bosses').delete().eq('id',id);
   await loadTiers();
 }
 
 async function addTier() {
   const tier = document.getElementById('new-tier').value.trim();
   const raid = document.getElementById('new-raid').value.trim();
-  if (!tier || !raid) { toast('Both fields required.', 'error'); return; }
-  const { data: ex } = await sb.from('progression').select('display_order').order('display_order',{ascending:false}).limit(1);
-  const nextOrder = (ex?.[0]?.display_order || 0) + 1;
-  const { error } = await sb.from('progression').insert({ tier, raid_name: raid, display_order: nextOrder });
-  if (error) { toast(error.message, 'error'); return; }
-  document.getElementById('new-tier').value = '';
-  document.getElementById('new-raid').value = '';
+  if (!tier||!raid) { toast('Both fields required.','error'); return; }
+  const {data:ex} = await sb.from('progression').select('display_order').order('display_order',{ascending:false}).limit(1);
+  await sb.from('progression').insert({tier,raid_name:raid,display_order:(ex?.[0]?.display_order||0)+1});
+  document.getElementById('new-tier').value='';
+  document.getElementById('new-raid').value='';
   hideAddTier();
-  toast('Tier added.', 'success');
   await loadTiers();
 }
 
-async function deleteTier(tierId) {
-  if (!confirm('Delete this entire tier and all its bosses?')) return;
-  await sb.from('progression').delete().eq('id', tierId);
-  toast('Tier deleted.', 'success');
+async function deleteTier(id) {
+  if (!confirm('Delete this tier and all its bosses?')) return;
+  await sb.from('progression').delete().eq('id',id);
   await loadTiers();
 }
 
-function showAddTier() { document.getElementById('add-tier-form').style.display = 'block'; }
-function hideAddTier() { document.getElementById('add-tier-form').style.display = 'none'; }
+function showAddTier() { document.getElementById('add-tier-form').style.display='block'; }
+function hideAddTier() { document.getElementById('add-tier-form').style.display='none'; }
 </script>
 </body>
 </html>
