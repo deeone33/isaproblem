@@ -24,21 +24,43 @@
     box-sizing: border-box;
   }
 
-  /* Officer officer inline edit overlay (officers only) */
-  .hero-editable {
+  /* Hero redesign with logo */
+  .hero-new {
     position: relative;
-    display: inline-block;
+    padding: 5rem 0 4rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3rem;
+    align-items: end;
+    overflow: hidden;
+    min-height: 420px;
   }
-  .edit-hint {
-    display: none;
+  .hero-logo-wrap {
     position: absolute;
-    top: -1.5rem; right: 0;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.2em;
-    color: var(--dim); text-transform: uppercase;
-    white-space: nowrap;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
   }
-  .hero-editable:hover .edit-hint { display: block; }
+  .hero-logo {
+    width: 340px;
+    height: 340px;
+    object-fit: contain;
+    opacity: 0.07;
+    filter: grayscale(100%) contrast(1.5);
+  }
+  .hero-left {
+    position: relative;
+    z-index: 1;
+  }
+  .hero-new .rank-block {
+    position: relative;
+    z-index: 1;
+  }
+  @media (max-width: 860px) {
+    .hero-new { grid-template-columns: 1fr; min-height: auto; }
+    .hero-logo { width: 220px; height: 220px; }
+  }
 </style>
 </head>
 <body>
@@ -47,8 +69,14 @@
 <div class="page">
 
   <!-- HERO -->
-  <section class="hero">
-    <div>
+  <section class="hero-new">
+    <!-- Logo centered, large, faded as background anchor -->
+    <div class="hero-logo-wrap">
+      <img src="logo.png" alt="" class="hero-logo" onerror="this.style.display='none'">
+    </div>
+
+    <!-- Left: text -->
+    <div class="hero-left">
       <div class="hero-eyebrow">Spineshatter EU · Horde · TBC Anniversary</div>
       <h1>IS A<br>PROBLEM</h1>
       <p class="hero-sub" id="hero-tagline">Loading…</p>
@@ -57,6 +85,8 @@
         <a href="login.html" class="btn btn-outline" id="login-btn">Member Login</a>
       </div>
     </div>
+
+    <!-- Right: rank -->
     <div class="rank-block">
       <div class="rank-num" id="hero-rank">…</div>
       <div class="rank-label" id="rank-label">World Rank · Speed Kills</div>
