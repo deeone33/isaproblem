@@ -175,34 +175,43 @@ async function runWclSync() {
 
     wclLog(`Fetching reports for <strong style="color:var(--bone)">${esc(guild)}</strong> — ${esc(server)} ${region}…`);
 
-    const { data, errors } = await wclQuery(token, `
+    // Step 1: verify guild exists
+    const guildResp = await wclQuery(token, `
       query($name:String!,$slug:String!,$region:String!) {
         guildData {
           guild(name:$name,serverSlug:$slug,serverRegion:$region) {
+            id
             name
-            reports(limit:50) {
-              data {
-                code
-                fights(killType:Kills) {
-                  name
-                  kill
-                  startTime
-                  endTime
-                }
-              }
-            }
           }
         }
       }`, { name:guild, slug:server.toLowerCase(), region });
 
-    if (errors) throw new Error(errors[0].message);
-    const guildObj = data?.guildData?.guild;
-    if (!guildObj) throw new Error('Guild not found. Check name, server, and region — make sure your logs are set to public.');
+    if (guildResp.errors) throw new Error(guildResp.errors[0].message);
+    const guildObj = guildResp.data && guildResp.data.guildData && guildResp.data.guildData.guild;
+    if (!guildObj) throw new Error('Guild not found. Check name, server, region and ensure logs are public.');
+    wclLog('\u2713 Guild found: <strong style="color:var(--bone)">' + esc(guildObj.name) + '</strong>');
 
-    wclLog(`✓ Guild found: <strong style="color:var(--bone)">${esc(guildObj.name)}</strong>`);
+    // Step 2: fetch reports via reportData (guild.reports removed in WCL API v2)
+    const reportsResp = await wclQuery(token, `
+      query($guild:String!,$server:String!,$region:String!) {
+        reportData {
+          reports(guildName:$guild,guildServerSlug:$server,guildServerRegion:$region,limit:50) {
+            data {
+              code
+              fights(killType:Kills) {
+                name
+                kill
+                startTime
+                endTime
+              }
+            }
+          }
+        }
+      }`, { guild, server:server.toLowerCase(), region });
 
-    const reports = guildObj.reports?.data || [];
-    wclLog(`Scanning ${reports.length} reports for kills…`);
+    if (reportsResp.errors) throw new Error(reportsResp.errors[0].message);
+    const reports = (reportsResp.data && reportsResp.data.reportData && reportsResp.data.reportData.reports && reportsResp.data.reportData.reports.data) || [];
+    wclLog('Scanning ' + reports.length + ' reports for kills\u2026');
 
     // Build best kill times per boss
     const best = {};
