@@ -30,37 +30,14 @@
     </p>
 
     <div id="wcl-setup">
-      <div class="col-2" style="margin-bottom:1rem;">
-        <div class="form-group">
-          <label class="form-label">WCL Client ID</label>
-          <input type="text" id="wcl-client-id" placeholder="Paste your WCL Client ID">
-        </div>
-        <div class="form-group">
-          <label class="form-label">WCL Client Secret</label>
-          <input type="password" id="wcl-client-secret" placeholder="Paste your WCL Client Secret">
-        </div>
-      </div>
-      <div class="col-3" style="margin-bottom:1rem;">
-        <div class="form-group">
-          <label class="form-label">Guild Name</label>
-          <input type="text" id="wcl-guild" value="Is a Problem">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Server</label>
-          <input type="text" id="wcl-server" value="Spineshatter">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Region</label>
-          <select id="wcl-region">
-            <option value="EU" selected>EU</option>
-            <option value="US">US</option>
-            <option value="KR">KR</option>
-            <option value="TW">TW</option>
-          </select>
-        </div>
-      </div>
-      <p style="color:var(--dim);font-size:0.78rem;margin-bottom:1rem;">
-        Get credentials at <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>. These are used only in your browser and never stored.
+      <!-- Credentials and guild pre-configured — officers just press the button -->
+      <input type="hidden" id="wcl-client-id" value="a1a998e6-a17e-48e2-8443-0df5a2211328">
+      <input type="hidden" id="wcl-client-secret" value="TstVCCe9OkLvspAHxv26Glrf1msSoHCi9QKmrbfW">
+      <input type="hidden" id="wcl-guild" value="is a problem">
+      <input type="hidden" id="wcl-server" value="Spineshatter">
+      <input type="hidden" id="wcl-region" value="EU">
+      <p style="color:var(--dim);font-size:0.85rem;margin-bottom:1.2rem;">
+        Fetches <strong style="color:var(--bone);">is a problem</strong> — Spineshatter EU from Warcraft Logs. Select which raids to import after fetching.
       </p>
       <div style="display:flex;gap:0.5rem;">
         <button onclick="runWclSync()" class="btn btn-primary" id="wcl-sync-btn">Fetch from WCL</button>
