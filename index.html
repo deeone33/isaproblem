@@ -8,80 +8,91 @@
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="style.css">
 <style>
-  /* Officer grid — fixed equal columns, no stretching */
+  /* Officer grid */
   .officers-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, 200px);
     gap: 0.6rem;
   }
   .officer-card {
-    width: 200px;
-    min-height: 110px;
-    padding: 1.5rem 1rem;
-    text-align: center;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    width: 200px; min-height: 110px;
+    padding: 1.5rem 1rem; text-align: center;
+    background: var(--surface); border: 1px solid var(--border);
     box-sizing: border-box;
   }
 
-  /* Hero redesign with logo */
+  /* Hero */
   .hero-new {
-    position: relative;
-    padding: 5rem 0 4rem;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 3rem;
-    align-items: end;
-    overflow: hidden;
-    min-height: 420px;
+    position: relative; padding: 5rem 0 4rem;
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 3rem; align-items: end;
+    overflow: hidden; min-height: 420px;
   }
   .hero-logo-wrap {
-    position: absolute;
-    top: 50%; left: 50%;
+    position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 0;
+    pointer-events: none; z-index: 0;
   }
   .hero-logo {
-    width: 380px;
-    height: 380px;
-    object-fit: contain;
-    opacity: 1;
+    width: 380px; height: 380px;
+    object-fit: contain; opacity: 1;
     mix-blend-mode: screen;
   }
-  .hero-left {
-    position: relative;
-    z-index: 1;
+  .hero-left { position: relative; z-index: 1; }
+  .hero-new .rank-block { position: relative; z-index: 1; }
+
+  /* Rankings carousel — compact single row */
+  .rank-carousel-wrap { overflow: hidden; }
+  .rank-carousel-track {
+    display: flex; gap: 0.5rem;
+    transition: transform 0.3s ease;
   }
-  .hero-new .rank-block {
-    position: relative;
-    z-index: 1;
+  .rank-chip {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 1.2rem;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 0.6rem 1.2rem;
+    white-space: nowrap;
   }
-  @media (max-width: 860px) {
-    .hero-new { grid-template-columns: 1fr; min-height: auto; }
-    .hero-logo { width: 220px; height: 220px; }
+  .rank-chip-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .rank-chip-nums { display: flex; gap: 1rem; align-items: center; }
+  .rank-chip-num { text-align: center; }
+  .rank-chip-num .n {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem; line-height: 1;
+  }
+  .rank-chip-num .l {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .rank-divider {
+    width: 1px; height: 2rem; background: var(--border);
   }
 
-  /* Progression carousel cards — all identical size */
+  /* Progression cards */
   .prog-card {
     flex: 0 0 calc((100% - 2rem) / 3);
-    min-width: 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 1.5rem;
-    box-sizing: border-box;
-    height: 580px;          /* tall enough for Karazhan's 11 bosses */
-    display: flex;
-    flex-direction: column;
+    min-width: 0; background: var(--surface);
+    border: 1px solid var(--border); padding: 1.5rem;
+    box-sizing: border-box; height: 580px;
+    display: flex; flex-direction: column;
     justify-content: space-between;
   }
-  .prog-boss-list {
-    overflow-y: auto;
-    max-height: 420px;
-  }
+  .prog-boss-list { overflow-y: auto; max-height: 420px; }
   .prog-boss-list::-webkit-scrollbar { width: 3px; }
   .prog-boss-list::-webkit-scrollbar-track { background: transparent; }
   .prog-boss-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  @media (max-width: 860px) {
+    .hero-new { grid-template-columns: 1fr; min-height: auto; }
+    .hero-logo { width: 220px; height: 220px; }
+    .prog-card { flex: 0 0 85vw; height: 480px; }
+  }
 </style>
 </head>
 <body>
@@ -91,12 +102,9 @@
 
   <!-- HERO -->
   <section class="hero-new">
-    <!-- Logo centered, large, faded as background anchor -->
     <div class="hero-logo-wrap">
       <img src="logo.png" alt="" class="hero-logo" onerror="this.style.display='none'">
     </div>
-
-    <!-- Left: text -->
     <div class="hero-left">
       <div class="hero-eyebrow">Spineshatter EU · Horde · TBC Anniversary</div>
       <h1>IS A<br>PROBLEM</h1>
@@ -106,8 +114,6 @@
         <a href="login.html" class="btn btn-outline" id="login-btn">Member Login</a>
       </div>
     </div>
-
-    <!-- Right: rank -->
     <div class="rank-block">
       <div class="rank-num" id="hero-rank">…</div>
       <div class="rank-label" id="rank-label">World Rank · Speed Kills</div>
@@ -117,28 +123,26 @@
     </div>
   </section>
 
-  <!-- OFFICER EDIT MODAL -->
-  <div id="settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;align-items:center;justify-content:center;">
-    <div class="card" style="width:100%;max-width:580px;padding:2rem;margin:1rem;">
-      <h3 style="margin-bottom:1.5rem;">Edit Hero Section</h3>
-      <div class="form-group">
-        <label class="form-label">World Rank</label>
-        <input type="text" id="set-rank" placeholder="#10">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Rank Label</label>
-        <input type="text" id="set-rank-label" placeholder="World Rank · Speed Kills">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tagline</label>
-        <textarea id="set-tagline" rows="3"></textarea>
-      </div>
-      <div style="display:flex;gap:0.5rem;margin-top:1rem;">
-        <button onclick="saveSettings()" class="btn btn-primary">Save</button>
-        <button onclick="closeSettings()" class="btn btn-outline">Cancel</button>
+  <!-- RANKINGS — compact carousel -->
+  <section class="section" style="margin-bottom:2rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+      <div class="label label-red">Speed Kill Rankings</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <div id="rank-nav" style="display:none;align-items:center;gap:0.4rem;">
+          <button onclick="slideRank(-1)" class="btn btn-outline btn-sm" id="rank-prev">←</button>
+          <button onclick="slideRank(1)"  class="btn btn-outline btn-sm" id="rank-next">→</button>
+        </div>
+        <div id="rankings-edit-btn" style="display:none;">
+          <a href="rankings.html" class="btn btn-outline btn-sm">Edit</a>
+        </div>
       </div>
     </div>
-  </div>
+    <div class="rank-carousel-wrap">
+      <div class="rank-carousel-track" id="rank-track">
+        <div class="empty" style="padding:0.5rem;">Loading…</div>
+      </div>
+    </div>
+  </section>
 
   <!-- PROGRESSION -->
   <section class="section">
@@ -150,27 +154,28 @@
       <div id="prog-nav" style="display:none;align-items:center;gap:0.5rem;">
         <button onclick="slideProg(-1)" class="btn btn-outline btn-sm" id="prog-prev">←</button>
         <span id="prog-counter" class="label" style="min-width:60px;text-align:center;"></span>
-        <button onclick="slideProg(1)" class="btn btn-outline btn-sm" id="prog-next">→</button>
+        <button onclick="slideProg(1)"  class="btn btn-outline btn-sm" id="prog-next">→</button>
       </div>
     </div>
-    <div style="overflow:hidden;position:relative;">
+    <div style="overflow:hidden;">
       <div id="prog-track" style="display:flex;gap:1rem;transition:transform 0.35s ease;">
         <div class="empty" style="padding:2rem;">Loading…</div>
       </div>
     </div>
   </section>
 
-  <!-- RANKINGS STRIP -->
-  <section class="section" style="margin-bottom:2rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
-      <div class="label">Speed Kill Rankings</div>
-      <div id="rankings-edit-btn" style="display:none;">
-        <a href="rankings.html" class="btn btn-outline btn-sm">Edit Rankings</a>
+  <!-- ABOUT -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label">About</div>
+        <h2>Who We Are</h2>
+      </div>
+      <div id="about-edit-btn" style="display:none;">
+        <button onclick="editAbout()" class="btn btn-outline btn-sm">Edit</button>
       </div>
     </div>
-    <div id="rankings-strip" style="display:flex;flex-wrap:wrap;gap:0.6rem;">
-      <div class="empty">Loading…</div>
-    </div>
+    <p id="about-text" style="max-width:800px;line-height:1.8;color:var(--light);white-space:pre-line;">Loading…</p>
   </section>
 
   <!-- NEWS -->
@@ -211,6 +216,44 @@
 
 </div>
 
+<!-- SETTINGS MODAL -->
+<div id="settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:100;align-items:center;justify-content:center;">
+  <div class="card" style="width:100%;max-width:560px;padding:2rem;margin:1rem;">
+    <h3 style="margin-bottom:1.5rem;">Edit Hero Section</h3>
+    <div class="form-group">
+      <label class="form-label">World Rank</label>
+      <input type="text" id="set-rank" placeholder="#10">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Rank Label</label>
+      <input type="text" id="set-rank-label" placeholder="World Rank · Speed Kills">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tagline</label>
+      <textarea id="set-tagline" rows="3"></textarea>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+      <button onclick="saveSettings()" class="btn btn-primary">Save</button>
+      <button onclick="closeModal('settings-modal')" class="btn btn-outline">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ABOUT MODAL -->
+<div id="about-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:100;align-items:center;justify-content:center;">
+  <div class="card" style="width:100%;max-width:660px;padding:2rem;margin:1rem;">
+    <h3 style="margin-bottom:1.5rem;">Edit About Text</h3>
+    <div class="form-group">
+      <label class="form-label">About the Guild</label>
+      <textarea id="set-about" rows="8" placeholder="Write who you are, your goals, your culture…"></textarea>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+      <button onclick="saveAbout()" class="btn btn-primary">Save</button>
+      <button onclick="closeModal('about-modal')" class="btn btn-outline">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 <script>
@@ -218,47 +261,99 @@
   await loadSession();
   renderNav('home');
 
-  // Hide login btn if already logged in
   if (isLoggedIn()) {
     document.getElementById('login-btn').textContent = 'Dashboard';
     document.getElementById('login-btn').href = 'dashboard.html';
   }
 
-  // Load site settings (rank, tagline)
+  // Site settings
   const { data: settings } = await sb.from('site_settings').select('*');
   const s = {};
-  (settings || []).forEach(r => s[r.key] = r.value);
-
+  (settings||[]).forEach(r => s[r.key] = r.value);
   document.getElementById('hero-rank').textContent    = s.world_rank   || '#10';
   document.getElementById('hero-tagline').textContent = s.hero_tagline || "Speed-first raiding guild. Top-10 world speed kills. We don't farm — we improve.";
   document.getElementById('rank-label').textContent   = s.rank_label   || 'World Rank · Speed Kills';
+  document.getElementById('about-text').textContent   = s.about_text   || '';
 
   if (isOfficer()) {
-    document.getElementById('rank-edit-btn').style.display = 'block';
+    document.getElementById('rank-edit-btn').style.display  = 'block';
+    document.getElementById('about-edit-btn').style.display = 'block';
+    document.getElementById('rankings-edit-btn').style.display = 'block';
   }
 
-  // Progression carousel
+  // ---- RANKINGS CAROUSEL ----
+  const { data: ranks } = await sb.from('rankings').select('*').order('display_order');
+  const rankTrack = document.getElementById('rank-track');
+  let rankOffset = 0;
+  const RANK_VISIBLE = 4;
+
+  if (!ranks || !ranks.length) {
+    rankTrack.innerHTML = '';
+  } else {
+    rankTrack.innerHTML = ranks.map(r => `
+      <div class="rank-chip">
+        <div class="rank-chip-name">${esc(r.raid_name)}</div>
+        <div class="rank-divider"></div>
+        <div class="rank-chip-nums">
+          <div class="rank-chip-num">
+            <div class="n" style="color:var(--white);">${r.world_rank||'—'}</div>
+            <div class="l">World</div>
+          </div>
+          <div class="rank-chip-num">
+            <div class="n" style="color:var(--red-bright);">${r.region_rank||'—'}</div>
+            <div class="l">Region</div>
+          </div>
+          <div class="rank-chip-num">
+            <div class="n" style="color:var(--red-bright);">${r.realm_rank||'—'}</div>
+            <div class="l">Realm</div>
+          </div>
+        </div>
+      </div>`).join('');
+
+    if (ranks.length > RANK_VISIBLE) {
+      document.getElementById('rank-nav').style.display = 'flex';
+    }
+    updateRankCarousel();
+  }
+
+  function updateRankCarousel() {
+    if (!ranks?.length) return;
+    const chip = rankTrack.querySelector('.rank-chip');
+    const chipW = chip ? chip.offsetWidth + 8 : 0;
+    rankTrack.style.transform = `translateX(-${rankOffset * chipW}px)`;
+    const max = Math.max(0, ranks.length - RANK_VISIBLE);
+    document.getElementById('rank-prev').disabled = rankOffset === 0;
+    document.getElementById('rank-next').disabled = rankOffset >= max;
+  }
+
+  window.slideRank = function(dir) {
+    if (!ranks?.length) return;
+    const max = Math.max(0, ranks.length - RANK_VISIBLE);
+    rankOffset = Math.max(0, Math.min(max, rankOffset + dir));
+    updateRankCarousel();
+  };
+
+  // ---- PROGRESSION CAROUSEL ----
   const { data: tiers } = await sb.from('progression')
     .select('id,tier,raid_name,display_order,bosses(id,name,kill_time,display_order)')
     .order('display_order');
 
   const track = document.getElementById('prog-track');
-  const VISIBLE = 3;  // cards shown at once
+  const VISIBLE = 3;
   let progOffset = 0;
 
   if (!tiers || !tiers.length) {
     track.innerHTML = '<div class="empty" style="padding:2rem;">No progression data yet.</div>';
   } else {
-    // Render all cards, fixed size
     track.innerHTML = tiers.map(t => {
-      const bosses = (t.bosses||[]).sort((a,b)=>a.display_order-b.display_order);
-      const cleared = bosses.filter(b=>b.kill_time).length;
+      const bosses = (t.bosses||[]).sort((a,b) => a.display_order - b.display_order);
+      const cleared = bosses.filter(b => b.kill_time).length;
       const pct = bosses.length ? Math.round((cleared/bosses.length)*100) : 0;
       return `<div class="prog-card">
         <div>
           <div class="label" style="margin-bottom:0.3rem;">${esc(t.tier)}</div>
           <h3 style="margin-bottom:1rem;">${esc(t.raid_name)}</h3>
-          <div class="prog-boss-list">${bosses.map(b=>`
+          <div class="prog-boss-list">${bosses.map(b => `
             <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
               <span style="color:var(--bone);">${esc(b.name)}</span>
               <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:${b.kill_time?'var(--accent)':'var(--dim)'};">${esc(b.kill_time||'—')}</span>
@@ -272,69 +367,34 @@
       </div>`;
     }).join('');
 
-    // Show nav arrows only if more than VISIBLE tiers
-    if (tiers.length > VISIBLE) {
-      document.getElementById('prog-nav').style.display = 'flex';
-    }
+    if (tiers.length > VISIBLE) document.getElementById('prog-nav').style.display = 'flex';
     updateProgCarousel();
   }
 
   function updateProgCarousel() {
     if (!tiers) return;
-    const cardWidth = track.querySelector('.prog-card')?.offsetWidth || 0;
-    const gap = 16;
-    track.style.transform = `translateX(-${progOffset * (cardWidth + gap)}px)`;
-
-    const maxOffset = Math.max(0, tiers.length - VISIBLE);
+    const card = track.querySelector('.prog-card');
+    const w = card ? card.offsetWidth + 16 : 0;
+    track.style.transform = `translateX(-${progOffset * w}px)`;
+    const max = Math.max(0, tiers.length - VISIBLE);
     document.getElementById('prog-prev').disabled = progOffset === 0;
-    document.getElementById('prog-next').disabled = progOffset >= maxOffset;
+    document.getElementById('prog-next').disabled = progOffset >= max;
     document.getElementById('prog-counter').textContent =
-      tiers.length > VISIBLE ? `${progOffset + 1}–${Math.min(progOffset + VISIBLE, tiers.length)} / ${tiers.length}` : '';
+      tiers.length > VISIBLE ? `${progOffset+1}–${Math.min(progOffset+VISIBLE, tiers.length)} / ${tiers.length}` : '';
   }
 
   window.slideProg = function(dir) {
     if (!tiers) return;
-    const maxOffset = Math.max(0, tiers.length - VISIBLE);
-    progOffset = Math.max(0, Math.min(maxOffset, progOffset + dir));
+    const max = Math.max(0, tiers.length - VISIBLE);
+    progOffset = Math.max(0, Math.min(max, progOffset + dir));
     updateProgCarousel();
   };
 
-  // Rankings
-  const { data: ranks } = await sb.from('rankings').select('*').order('display_order');
-  const rs = document.getElementById('rankings-strip');
-  if (ranks && ranks.length) {
-    rs.innerHTML = ranks.map(r => `
-      <div style="background:var(--surface);border:1px solid var(--border);padding:1rem 1.5rem;display:flex;align-items:center;gap:2rem;flex-wrap:wrap;">
-        <div>
-          <div class="label" style="margin-bottom:0.2rem;">${esc(r.raid_name)}</div>
-        </div>
-        <div style="display:flex;gap:1.5rem;">
-          <div style="text-align:center;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1;color:var(--white);">${r.world_rank||'—'}</div>
-            <div class="label">World</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1;color:var(--red-bright);">${r.region_rank||'—'}</div>
-            <div class="label">Region</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1;color:var(--red-bright);">${r.realm_rank||'—'}</div>
-            <div class="label">Realm</div>
-          </div>
-        </div>
-      </div>`).join('');
-  } else {
-    rs.innerHTML = '';
-  }
-  if (isOfficer()) document.getElementById('rankings-edit-btn').style.display = 'block';
-
-  // News
+  // ---- NEWS ----
   const { data: news } = await sb.from('news').select('*').order('created_at',{ascending:false}).limit(6);
   const nl = document.getElementById('news-list');
-  if (!news||!news.length) {
-    nl.innerHTML = '<div class="empty">No news yet.</div>';
-  } else {
-    nl.innerHTML = news.map(n=>`
+  nl.innerHTML = !news?.length ? '<div class="empty">No news yet.</div>' :
+    news.map(n => `
       <div class="card card-accent">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.5rem;">
           <h3>${esc(n.title)}</h3>
@@ -342,15 +402,13 @@
         </div>
         <p style="white-space:pre-line;">${esc(n.body)}</p>
       </div>`).join('');
-  }
 
-  // Recruitment
+  // ---- RECRUITMENT ----
   const { data: rec } = await sb.from('recruitment').select('*').order('priority').order('created_at');
   const rl = document.getElementById('recruit-list');
-  if (!rec||!rec.length) {
-    rl.innerHTML = '<div class="empty">No open spots listed. Exceptional players always considered — <a href="apply.html">apply anyway</a>.</div>';
-  } else {
-    rl.innerHTML = rec.map(r=>`
+  rl.innerHTML = !rec?.length ?
+    '<div class="empty">No open spots. Exceptional players always considered — <a href="apply.html">apply anyway</a>.</div>' :
+    rec.map(r => `
       <div class="row" style="justify-content:space-between;">
         <div>
           <div style="color:var(--bone);font-weight:500;">${esc(r.class_name)}</div>
@@ -358,64 +416,65 @@
         </div>
         <span class="badge badge-${r.priority}">${r.priority}</span>
       </div>`).join('');
-  }
 
-  // Officers
+  // ---- OFFICERS ----
   const { data: offs } = await sb.from('officers').select('*').order('display_order');
   const ol = document.getElementById('officers-list');
-  if (!offs||!offs.length) {
-    ol.innerHTML = '<div class="empty">Leadership info coming soon.</div>';
-  } else {
-    ol.innerHTML = offs.map(o=>`
+  ol.innerHTML = !offs?.length ? '<div class="empty">Leadership info coming soon.</div>' :
+    offs.map(o => `
       <div class="officer-card">
         <div style="font-size:0.9rem;font-weight:500;color:var(--white);margin-bottom:0.3rem;">${esc(o.name)}</div>
         <div class="label label-accent">${esc(o.title)}</div>
-        ${o.class_spec?`<div style="color:var(--dim);font-size:0.8rem;margin-top:0.4rem;">${esc(o.class_spec)}</div>`:''}
+        ${o.class_spec ? `<div style="color:var(--dim);font-size:0.8rem;margin-top:0.4rem;">${esc(o.class_spec)}</div>` : ''}
       </div>`).join('');
-  }
 })();
 
-// Settings modal
+// ---- MODALS ----
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+document.getElementById('settings-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal('settings-modal'); });
+document.getElementById('about-modal').addEventListener('click',    e => { if (e.target === e.currentTarget) closeModal('about-modal'); });
+
 async function editSettings() {
   const { data } = await sb.from('site_settings').select('*');
   const s = {};
-  (data||[]).forEach(r => s[r.key]=r.value);
-  document.getElementById('set-rank').value       = s.world_rank||'#10';
-  document.getElementById('set-rank-label').value = s.rank_label||'World Rank · Speed Kills';
-  document.getElementById('set-tagline').value    = s.hero_tagline||'';
+  (data||[]).forEach(r => s[r.key] = r.value);
+  document.getElementById('set-rank').value       = s.world_rank || '#10';
+  document.getElementById('set-rank-label').value = s.rank_label || 'World Rank · Speed Kills';
+  document.getElementById('set-tagline').value    = s.hero_tagline || '';
   document.getElementById('settings-modal').style.display = 'flex';
-}
-
-function closeSettings() {
-  document.getElementById('settings-modal').style.display = 'none';
 }
 
 async function saveSettings() {
   const rank      = document.getElementById('set-rank').value.trim();
   const rankLabel = document.getElementById('set-rank-label').value.trim();
   const tagline   = document.getElementById('set-tagline').value.trim();
-
   const updates = [
     { key:'world_rank',   value: rank      || '#10' },
     { key:'rank_label',   value: rankLabel || 'World Rank · Speed Kills' },
     { key:'hero_tagline', value: tagline   || '' },
   ];
-
-  for (const u of updates) {
-    await sb.from('site_settings').upsert(u, { onConflict:'key' });
-  }
-
+  for (const u of updates) await sb.from('site_settings').upsert(u, { onConflict:'key' });
   document.getElementById('hero-rank').textContent    = rank;
   document.getElementById('rank-label').textContent   = rankLabel;
   document.getElementById('hero-tagline').textContent = tagline;
-  closeSettings();
+  closeModal('settings-modal');
   toast('Saved.', 'success');
 }
 
-// Close modal on background click
-document.getElementById('settings-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeSettings();
-});
+async function editAbout() {
+  const { data } = await sb.from('site_settings').select('value').eq('key','about_text').single();
+  document.getElementById('set-about').value = data?.value || '';
+  document.getElementById('about-modal').style.display = 'flex';
+}
+
+async function saveAbout() {
+  const value = document.getElementById('set-about').value.trim();
+  await sb.from('site_settings').upsert({ key:'about_text', value }, { onConflict:'key' });
+  document.getElementById('about-text').textContent = value;
+  closeModal('about-modal');
+  toast('Saved.', 'success');
+}
 </script>
 </body>
 </html>
