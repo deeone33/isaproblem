@@ -1,27 +1,29 @@
 /* ============================================
    IS A PROBLEM — stylesheet
-   Palette pulled from the logo:
-   near-black, charcoal, off-white, silver accent
+   Background matched to logo: #111010
+   Accent: silver + dark red
    ============================================ */
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --black:   #0d0d0d;
-  --deep:    #141414;
-  --surface: #1c1c1c;
-  --lift:    #252525;
-  --border:  #2e2e2e;
-  --dim:     #555;
-  --mid:     #888;
-  --light:   #b8b8b8;
-  --bone:    #ddd;
-  --white:   #f0f0f0;
-  --accent:  #c8c8c8;   /* silver — from logo highlight */
+  --black:   #111010;   /* matched to logo background */
+  --deep:    #181616;
+  --surface: #1e1c1c;
+  --lift:    #272424;
+  --border:  #302c2c;
+  --dim:     #575252;
+  --mid:     #8a8585;
+  --light:   #b8b3b3;
+  --bone:    #ddd8d8;
+  --white:   #f0ecec;
+  --accent:  #c8c8c8;   /* silver from logo */
+  --red:     #8a1f1f;   /* dark blood red accent */
+  --red-bright: #b03030; /* hover/active red */
   --strike:  #ffffff;
   --danger:  #c93030;
   --ok:      #6a9955;
   --warn:    #c9a961;
-  --radius:  0;         /* brutally square — fits the aesthetic */
+  --radius:  0;
 }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -36,7 +38,7 @@ body {
   min-height: 100vh;
 }
 
-::selection { background: rgba(255,255,255,0.15); }
+::selection { background: rgba(176,48,48,0.35); }
 
 img { display: block; max-width: 100%; }
 a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
@@ -60,11 +62,12 @@ p { color: var(--light); }
   text-transform: uppercase; color: var(--dim);
 }
 .label-accent { color: var(--accent); }
+.label-red { color: var(--red-bright); }
 
 /* ===== NAV ===== */
 .topnav {
   position: sticky; top: 0; z-index: 50;
-  background: rgba(13,13,13,0.96);
+  background: rgba(17,16,16,0.97);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(8px);
   padding: 0 2rem;
@@ -93,8 +96,8 @@ p { color: var(--light); }
   border-bottom: 2px solid transparent;
   transition: all 0.2s;
 }
-.topnav nav a:hover { color: var(--bone); }
-.topnav nav a.active { color: var(--white); border-color: var(--white); }
+.topnav nav a:hover { color: var(--bone); border-color: rgba(176,48,48,0.3); }
+.topnav nav a.active { color: var(--white); border-color: var(--red-bright); }
 .topnav .userbox {
   display: flex; align-items: center; gap: 0.8rem;
   font-family: 'JetBrains Mono', monospace;
@@ -142,7 +145,7 @@ p { color: var(--light); }
   color: var(--dim); margin-bottom: 1rem;
   display: flex; align-items: center; gap: 1rem;
 }
-.hero-eyebrow::before { content: ''; display: inline-block; width: 40px; height: 1px; background: var(--dim); }
+.hero-eyebrow::before { content: ''; display: inline-block; width: 40px; height: 1px; background: var(--red-bright); }
 .hero h1 { margin-bottom: 0.8rem; }
 .hero-sub {
   font-size: 1rem; color: var(--mid); max-width: 520px;
@@ -165,8 +168,8 @@ p { color: var(--light); }
   background: transparent; transition: all 0.18s;
   text-decoration: none; white-space: nowrap;
 }
-.btn-primary { color: var(--black); background: var(--white); border-color: var(--white); }
-.btn-primary:hover { background: var(--accent); border-color: var(--accent); color: var(--black); }
+.btn-primary { color: var(--white); background: var(--red); border-color: var(--red); }
+.btn-primary:hover { background: var(--red-bright); border-color: var(--red-bright); color: var(--white); }
 .btn-outline { color: var(--bone); border-color: var(--border); }
 .btn-outline:hover { border-color: var(--bone); color: var(--white); }
 .btn-danger { color: var(--danger); border-color: rgba(201,48,48,0.3); }
@@ -189,7 +192,7 @@ p { color: var(--light); }
   display: flex; justify-content: space-between;
   align-items: flex-start; gap: 1rem; margin-bottom: 0.7rem;
 }
-.card-accent { border-left: 2px solid var(--accent); }
+.card-accent { border-left: 2px solid var(--red-bright); }
 .card-ok { border-left: 2px solid var(--ok); }
 .card-warn { border-left: 2px solid var(--warn); }
 .card-danger { border-left: 2px solid var(--danger); }
@@ -246,7 +249,7 @@ select option { background: var(--deep); }
 
 /* ===== PROGRESS BAR ===== */
 .prog-bar { height: 2px; background: var(--border); position: relative; overflow: hidden; margin-top: 0.8rem; }
-.prog-fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); transition: width 0.5s ease; }
+.prog-fill { position: absolute; inset: 0 auto 0 0; background: var(--red-bright); transition: width 0.5s ease; }
 
 /* ===== TOAST ===== */
 .toast {

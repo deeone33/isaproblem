@@ -78,7 +78,7 @@ function renderNav(active) {
   let user = '';
   if (currentProfile) {
     user = `<span class="uname">${esc(currentProfile.username)}</span>
-            <span class="urole">${isOfficer() ? 'Officer' : 'Member'}</span>
+            <span class="urole" style="color:${isOfficer() ? 'var(--red-bright)' : 'var(--accent)'}">${isOfficer() ? 'Officer' : 'Member'}</span>
             <button class="btn btn-outline btn-sm" onclick="doLogout()">Logout</button>`;
   } else {
     user = `<a href="login.html" class="btn btn-outline btn-sm">Login</a>`;
@@ -86,7 +86,7 @@ function renderNav(active) {
 
   el.innerHTML = `
     <a href="index.html" class="brand">
-      <img src="logo.png" alt="Is a Problem logo" style="width:38px;height:38px;object-fit:contain;" onerror="this.style.display='none'">
+      <img src="logo.png" alt="Is a Problem logo" style="width:38px;height:38px;object-fit:contain;border-radius:2px;" onerror="this.style.display='none'">
       <span>IS A PROBLEM</span>
     </a>
     <nav>${navLinks}</nav>
