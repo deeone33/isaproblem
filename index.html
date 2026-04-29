@@ -61,6 +61,27 @@
     .hero-new { grid-template-columns: 1fr; min-height: auto; }
     .hero-logo { width: 220px; height: 220px; }
   }
+
+  /* Progression carousel cards — all identical size */
+  .prog-card {
+    flex: 0 0 calc((100% - 2rem) / 3);
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    box-sizing: border-box;
+    height: 580px;          /* tall enough for Karazhan's 11 bosses */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .prog-boss-list {
+    overflow-y: auto;
+    max-height: 420px;
+  }
+  .prog-boss-list::-webkit-scrollbar { width: 3px; }
+  .prog-boss-list::-webkit-scrollbar-track { background: transparent; }
+  .prog-boss-list::-webkit-scrollbar-thumb { background: var(--border); }
 </style>
 </head>
 <body>
@@ -126,9 +147,16 @@
         <div class="label">Progression</div>
         <h2>The Hunt</h2>
       </div>
+      <div id="prog-nav" style="display:none;align-items:center;gap:0.5rem;">
+        <button onclick="slideProg(-1)" class="btn btn-outline btn-sm" id="prog-prev">←</button>
+        <span id="prog-counter" class="label" style="min-width:60px;text-align:center;"></span>
+        <button onclick="slideProg(1)" class="btn btn-outline btn-sm" id="prog-next">→</button>
+      </div>
     </div>
-    <div id="prog-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
-      <div class="empty">Loading…</div>
+    <div style="overflow:hidden;position:relative;">
+      <div id="prog-track" style="display:flex;gap:1rem;transition:transform 0.35s ease;">
+        <div class="empty" style="padding:2rem;">Loading…</div>
+      </div>
     </div>
   </section>
 
@@ -196,33 +224,67 @@
     document.getElementById('rank-edit-btn').style.display = 'block';
   }
 
-  // Progression
+  // Progression carousel
   const { data: tiers } = await sb.from('progression')
     .select('id,tier,raid_name,display_order,bosses(id,name,kill_time,display_order)')
     .order('display_order');
 
-  const pg = document.getElementById('prog-grid');
+  const track = document.getElementById('prog-track');
+  const VISIBLE = 3;  // cards shown at once
+  let progOffset = 0;
+
   if (!tiers || !tiers.length) {
-    pg.innerHTML = '<div class="empty">No progression data yet.</div>';
+    track.innerHTML = '<div class="empty" style="padding:2rem;">No progression data yet.</div>';
   } else {
-    pg.innerHTML = tiers.map(t => {
+    // Render all cards, fixed size
+    track.innerHTML = tiers.map(t => {
       const bosses = (t.bosses||[]).sort((a,b)=>a.display_order-b.display_order);
       const cleared = bosses.filter(b=>b.kill_time).length;
       const pct = bosses.length ? Math.round((cleared/bosses.length)*100) : 0;
-      return `<div class="card">
-        <div class="label" style="margin-bottom:0.3rem;">${esc(t.tier)}</div>
-        <h3 style="margin-bottom:1rem;">${esc(t.raid_name)}</h3>
-        <div>${bosses.map(b=>`
-          <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
-            <span style="color:var(--bone);">${esc(b.name)}</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:${b.kill_time?'var(--accent)':'var(--dim)'};">${esc(b.kill_time||'—')}</span>
-          </div>`).join('')}
+      return `<div class="prog-card">
+        <div>
+          <div class="label" style="margin-bottom:0.3rem;">${esc(t.tier)}</div>
+          <h3 style="margin-bottom:1rem;">${esc(t.raid_name)}</h3>
+          <div class="prog-boss-list">${bosses.map(b=>`
+            <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
+              <span style="color:var(--bone);">${esc(b.name)}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:${b.kill_time?'var(--accent)':'var(--dim)'};">${esc(b.kill_time||'—')}</span>
+            </div>`).join('')}
+          </div>
         </div>
-        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
-        <div style="margin-top:0.4rem;"><span class="label">${cleared}/${bosses.length} bosses</span></div>
+        <div>
+          <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+          <div style="margin-top:0.4rem;"><span class="label">${cleared}/${bosses.length} bosses</span></div>
+        </div>
       </div>`;
     }).join('');
+
+    // Show nav arrows only if more than VISIBLE tiers
+    if (tiers.length > VISIBLE) {
+      document.getElementById('prog-nav').style.display = 'flex';
+    }
+    updateProgCarousel();
   }
+
+  function updateProgCarousel() {
+    if (!tiers) return;
+    const cardWidth = track.querySelector('.prog-card')?.offsetWidth || 0;
+    const gap = 16;
+    track.style.transform = `translateX(-${progOffset * (cardWidth + gap)}px)`;
+
+    const maxOffset = Math.max(0, tiers.length - VISIBLE);
+    document.getElementById('prog-prev').disabled = progOffset === 0;
+    document.getElementById('prog-next').disabled = progOffset >= maxOffset;
+    document.getElementById('prog-counter').textContent =
+      tiers.length > VISIBLE ? `${progOffset + 1}–${Math.min(progOffset + VISIBLE, tiers.length)} / ${tiers.length}` : '';
+  }
+
+  window.slideProg = function(dir) {
+    if (!tiers) return;
+    const maxOffset = Math.max(0, tiers.length - VISIBLE);
+    progOffset = Math.max(0, Math.min(maxOffset, progOffset + dir));
+    updateProgCarousel();
+  };
 
   // News
   const { data: news } = await sb.from('news').select('*').order('created_at',{ascending:false}).limit(6);
