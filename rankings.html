@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rankings — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page-narrow">
+  <a href="dashboard.html" class="back">Dashboard</a>
+  <div class="label" style="margin-bottom:0.5rem;">Officer Tools</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:0.5rem;">
+    <h1>Speed Kill Rankings</h1>
+    <button onclick="toggleAddForm()" class="btn btn-primary">+ Add Zone</button>
+  </div>
+  <p style="color:var(--dim);margin-bottom:2rem;font-size:0.85rem;">
+    Edit world, region, and realm rankings for each raid zone. These display publicly on the homepage under the progression section.
+  </p>
+
+  <div id="add-form" class="card" style="display:none;margin-bottom:1.5rem;border-color:var(--accent);">
+    <h3 style="margin-bottom:1rem;">Add Zone</h3>
+    <div class="form-group">
+      <label class="form-label">Zone Name</label>
+      <input type="text" id="new-zone" placeholder="Serpentshrine Cavern">
+    </div>
+    <div class="col-3">
+      <div class="form-group">
+        <label class="form-label">World Rank</label>
+        <input type="number" id="new-world" placeholder="1" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Region Rank</label>
+        <input type="number" id="new-region" placeholder="1" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Realm Rank</label>
+        <input type="number" id="new-realm" placeholder="1" min="1">
+      </div>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+      <button onclick="addRanking()" class="btn btn-primary btn-sm">Add</button>
+      <button onclick="toggleAddForm()" class="btn btn-outline btn-sm">Cancel</button>
+    </div>
+  </div>
+
+  <div id="rankings-list"><div class="empty">Loading…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  if (!(await requireOfficer())) return;
+  renderNav('dashboard');
+  await loadRankings();
+})();
+
+async function loadRankings() {
+  const { data } = await sb.from('rankings').select('*').order('display_order');
+  const el = document.getElementById('rankings-list');
+  if (!data?.length) { el.innerHTML = '<div class="empty">No rankings yet.</div>'; return; }
+
+  el.innerHTML = data.map((r, i) => `
+    <div class="card" style="margin-bottom:0.6rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+        <div style="flex:1;min-width:180px;">
+          <label class="form-label">Zone</label>
+          <input type="text" id="zone-${r.id}" value="${esc(r.raid_name)}"
+            onblur="saveRanking('${r.id}')" onkeydown="if(event.key==='Enter')this.blur()">
+        </div>
+        <div class="col-3" style="flex:2;min-width:240px;margin-bottom:0;">
+          <div>
+            <label class="form-label">World</label>
+            <input type="number" id="world-${r.id}" value="${r.world_rank||''}" min="1"
+              onblur="saveRanking('${r.id}')" onkeydown="if(event.key==='Enter')this.blur()"
+              style="text-align:center;">
+          </div>
+          <div>
+            <label class="form-label">Region</label>
+            <input type="number" id="region-${r.id}" value="${r.region_rank||''}" min="1"
+              onblur="saveRanking('${r.id}')" onkeydown="if(event.key==='Enter')this.blur()"
+              style="text-align:center;">
+          </div>
+          <div>
+            <label class="form-label">Realm</label>
+            <input type="number" id="realm-${r.id}" value="${r.realm_rank||''}" min="1"
+              onblur="saveRanking('${r.id}')" onkeydown="if(event.key==='Enter')this.blur()"
+              style="text-align:center;">
+          </div>
+        </div>
+        <div style="display:flex;gap:0.4rem;align-items:center;">
+          <button onclick="moveRanking('${r.id}',${r.display_order},'up')" class="btn btn-outline btn-sm" ${i===0?'disabled':''}>↑</button>
+          <button onclick="moveRanking('${r.id}',${r.display_order},'down')" class="btn btn-outline btn-sm" ${i===data.length-1?'disabled':''}>↓</button>
+          <button onclick="deleteRanking('${r.id}','${esc(r.raid_name)}')" class="btn btn-danger btn-sm">Remove</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function saveRanking(id) {
+  const raid_name   = document.getElementById(`zone-${id}`)?.value.trim();
+  const world_rank  = parseInt(document.getElementById(`world-${id}`)?.value) || null;
+  const region_rank = parseInt(document.getElementById(`region-${id}`)?.value) || null;
+  const realm_rank  = parseInt(document.getElementById(`realm-${id}`)?.value) || null;
+  if (!raid_name) return;
+  const { error } = await sb.from('rankings').update({ raid_name, world_rank, region_rank, realm_rank }).eq('id', id);
+  if (error) toast(error.message, 'error');
+  else toast('Saved.', 'success');
+}
+
+async function addRanking() {
+  const raid_name   = document.getElementById('new-zone').value.trim();
+  const world_rank  = parseInt(document.getElementById('new-world').value) || null;
+  const region_rank = parseInt(document.getElementById('new-region').value) || null;
+  const realm_rank  = parseInt(document.getElementById('new-realm').value) || null;
+  if (!raid_name) { toast('Zone name required.', 'error'); return; }
+  const { data: ex } = await sb.from('rankings').select('display_order').order('display_order',{ascending:false}).limit(1);
+  const display_order = (ex?.[0]?.display_order || 0) + 1;
+  const { error } = await sb.from('rankings').insert({ raid_name, world_rank, region_rank, realm_rank, display_order });
+  if (error) { toast(error.message, 'error'); return; }
+  document.getElementById('new-zone').value = '';
+  document.getElementById('new-world').value = '';
+  document.getElementById('new-region').value = '';
+  document.getElementById('new-realm').value = '';
+  toggleAddForm();
+  toast('Zone added.', 'success');
+  await loadRankings();
+}
+
+async function deleteRanking(id, name) {
+  if (!confirm(`Remove ${name} from rankings?`)) return;
+  await sb.from('rankings').delete().eq('id', id);
+  toast('Removed.', 'success');
+  await loadRankings();
+}
+
+async function moveRanking(id, order, dir) {
+  if (dir === 'up') {
+    const { data: above } = await sb.from('rankings').select('id,display_order').lt('display_order',order).order('display_order',{ascending:false}).limit(1);
+    if (!above?.length) return;
+    await sb.from('rankings').update({display_order:order}).eq('id',above[0].id);
+    await sb.from('rankings').update({display_order:above[0].display_order}).eq('id',id);
+  } else {
+    const { data: below } = await sb.from('rankings').select('id,display_order').gt('display_order',order).order('display_order',{ascending:true}).limit(1);
+    if (!below?.length) return;
+    await sb.from('rankings').update({display_order:order}).eq('id',below[0].id);
+    await sb.from('rankings').update({display_order:below[0].display_order}).eq('id',id);
+  }
+  await loadRankings();
+}
+
+function toggleAddForm() {
+  const f = document.getElementById('add-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>

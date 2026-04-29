@@ -65,6 +65,7 @@ function renderNav(active) {
     links.push({ href: 'recruitment.html', id: 'recruitment', label: 'Recruitment' });
     links.push({ href: 'applications.html', id: 'applications', label: 'Applications' });
     links.push({ href: 'officers.html', id: 'officers', label: 'Officers' });
+    links.push({ href: 'rankings.html', id: 'rankings', label: 'Rankings' });
     links.push({ href: 'formeditor.html', id: 'formeditor', label: 'Form Editor' });
   }
   if (!isMember()) {
