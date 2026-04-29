@@ -175,29 +175,22 @@ async function runWclSync() {
 
     wclLog(`Fetching reports for <strong style="color:var(--bone)">${esc(guild)}</strong> — ${esc(server)} ${region}…`);
 
-    // Step 1: verify guild exists
-    const guildResp = await wclQuery(token, `
-      query($name:String!,$slug:String!,$region:String!) {
-        guildData {
-          guild(name:$name,serverSlug:$slug,serverRegion:$region) {
-            id
-            name
-          }
-        }
-      }`, { name:guild, slug:server.toLowerCase(), region });
-
-    if (guildResp.errors) throw new Error(guildResp.errors[0].message);
-    const guildObj = guildResp.data && guildResp.data.guildData && guildResp.data.guildData.guild;
-    if (!guildObj) throw new Error('Guild not found. Check name, server, region and ensure logs are public.');
-    wclLog('\u2713 Guild found: <strong style="color:var(--bone)">' + esc(guildObj.name) + '</strong>');
-
-    // Step 2: fetch reports via reportData (guild.reports removed in WCL API v2)
+    // Fetch reports directly via reportData with guild filters
+    // Note: guildData.guild query requires a claimed guild on WCL which may not exist.
+    // reportData.reports with guild filters works as long as logs were uploaded with guild tag.
+    wclLog('Fetching guild reports\u2026');
     const reportsResp = await wclQuery(token, `
       query($guild:String!,$server:String!,$region:String!) {
         reportData {
-          reports(guildName:$guild,guildServerSlug:$server,guildServerRegion:$region,limit:50) {
+          reports(
+            guildName:$guild,
+            guildServerSlug:$server,
+            guildServerRegion:$region,
+            limit:50
+          ) {
             data {
               code
+              guild { name }
               fights(killType:Kills) {
                 name
                 kill
@@ -210,7 +203,53 @@ async function runWclSync() {
       }`, { guild, server:server.toLowerCase(), region });
 
     if (reportsResp.errors) throw new Error(reportsResp.errors[0].message);
-    const reports = (reportsResp.data && reportsResp.data.reportData && reportsResp.data.reportData.reports && reportsResp.data.reportData.reports.data) || [];
+
+    const reportsRaw = (reportsResp.data && reportsResp.data.reportData && reportsResp.data.reportData.reports && reportsResp.data.reportData.reports.data) || [];
+
+    // If guild filter returned nothing, try fetching without guild filter using zone IDs
+    // TBC zone IDs: Karazhan=1000, Gruul=1001, Mag=1002, SSC=1003, TK=1004, Hyjal=1005, BT=1006, ZA=1007, SWP=1008
+    // (approximate — WCL uses internal zone IDs)
+    let reports = reportsRaw;
+
+    if (!reports.length) {
+      wclLog('Guild filter returned no results. Trying zone-based search\u2026');
+      // Try fetching recent reports from the server and filter by guild name in metadata
+      const zoneResp = await wclQuery(token, `
+        query($server:String!,$region:String!) {
+          reportData {
+            reports(
+              guildServerSlug:$server,
+              guildServerRegion:$region,
+              limit:50
+            ) {
+              data {
+                code
+                guild { name }
+                fights(killType:Kills) {
+                  name
+                  kill
+                  startTime
+                  endTime
+                }
+              }
+            }
+          }
+        }`, { server:server.toLowerCase(), region });
+
+      if (!zoneResp.errors) {
+        const allReports = (zoneResp.data && zoneResp.data.reportData && zoneResp.data.reportData.reports && zoneResp.data.reportData.reports.data) || [];
+        // Filter to only reports from our guild (case-insensitive)
+        reports = allReports.filter(r => r.guild && r.guild.name && r.guild.name.toLowerCase() === guild.toLowerCase());
+        if (reports.length) {
+          wclLog('\u2713 Found ' + reports.length + ' reports via server search');
+        } else {
+          throw new Error('No reports found for guild "' + guild + '" on ' + server + '. Make sure logs are uploaded with the guild tag and set to public.');
+        }
+      }
+    } else {
+      wclLog('\u2713 Found ' + reports.length + ' guild reports');
+    }
+
     wclLog('Scanning ' + reports.length + ' reports for kills\u2026');
 
     // Build best kill times per boss
