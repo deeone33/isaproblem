@@ -6,13 +6,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --black:   #111010;   /* matched to logo background */
-  --deep:    #181616;
-  --surface: #1e1c1c;
-  --lift:    #272424;
-  --border:  #302c2c;
-  --dim:     #575252;
-  --mid:     #8a8585;
+  --black:   #1a1818;   /* matched to logo background exactly */
+  --deep:    #201e1e;
+  --surface: #272424;
+  --lift:    #302c2c;
+  --border:  #3a3535;
+  --dim:     #605a5a;
+  --mid:     #908888;
   --light:   #b8b3b3;
   --bone:    #ddd8d8;
   --white:   #f0ecec;
@@ -67,7 +67,7 @@ p { color: var(--light); }
 /* ===== NAV ===== */
 .topnav {
   position: sticky; top: 0; z-index: 50;
-  background: rgba(17,16,16,0.97);
+  background: rgba(26,24,24,0.97);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(8px);
   padding: 0 2rem;
