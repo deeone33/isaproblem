@@ -85,7 +85,7 @@ function renderNav(active) {
 
   el.innerHTML = `
     <a href="index.html" class="brand">
-      <img src="logo.png" alt="Is a Problem logo" onerror="this.style.display='none'">
+      <img src="logo.png" alt="Is a Problem logo" style="width:38px;height:38px;object-fit:contain;" onerror="this.style.display='none'">
       <span>IS A PROBLEM</span>
     </a>
     <nav>${navLinks}</nav>

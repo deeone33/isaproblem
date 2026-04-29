@@ -4,31 +4,90 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Is a Problem — Horde · Spineshatter EU</title>
-<meta name="description" content="Top-10 TBC Anniversary speed kill guild on Spineshatter EU. Rank #10 world. Recruiting exceptional players.">
+<meta name="description" content="Top-10 TBC Anniversary speed kill guild on Spineshatter EU. Recruiting exceptional players.">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="style.css">
+<style>
+  /* Officer grid — fixed equal columns, no stretching */
+  .officers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 200px);
+    gap: 0.6rem;
+  }
+  .officer-card {
+    width: 200px;
+    min-height: 110px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-sizing: border-box;
+  }
+
+  /* Officer officer inline edit overlay (officers only) */
+  .hero-editable {
+    position: relative;
+    display: inline-block;
+  }
+  .edit-hint {
+    display: none;
+    position: absolute;
+    top: -1.5rem; right: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.2em;
+    color: var(--dim); text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .hero-editable:hover .edit-hint { display: block; }
+</style>
 </head>
 <body>
-
 <header class="topnav" id="topnav"></header>
 
 <div class="page">
 
+  <!-- HERO -->
   <section class="hero">
     <div>
       <div class="hero-eyebrow">Spineshatter EU · Horde · TBC Anniversary</div>
       <h1>IS A<br>PROBLEM</h1>
-      <p class="hero-sub">Speed-first raiding guild. Top-10 world speed kills. We don't farm — we improve.</p>
+      <p class="hero-sub" id="hero-tagline">Loading…</p>
       <div style="display:flex;gap:1rem;flex-wrap:wrap;">
         <a href="apply.html" class="btn btn-primary">Apply to Trial</a>
-        <a href="login.html" class="btn btn-outline">Member Login</a>
+        <a href="login.html" class="btn btn-outline" id="login-btn">Member Login</a>
       </div>
     </div>
     <div class="rank-block">
-      <div class="rank-num" id="hero-rank">#10</div>
-      <div class="rank-label">World Rank · Speed Kills</div>
+      <div class="rank-num" id="hero-rank">…</div>
+      <div class="rank-label" id="rank-label">World Rank · Speed Kills</div>
+      <div id="rank-edit-btn" style="display:none;margin-top:0.8rem;">
+        <button onclick="editSettings()" class="btn btn-outline btn-sm">Edit</button>
+      </div>
     </div>
   </section>
+
+  <!-- OFFICER EDIT MODAL -->
+  <div id="settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;align-items:center;justify-content:center;">
+    <div class="card" style="width:100%;max-width:580px;padding:2rem;margin:1rem;">
+      <h3 style="margin-bottom:1.5rem;">Edit Hero Section</h3>
+      <div class="form-group">
+        <label class="form-label">World Rank</label>
+        <input type="text" id="set-rank" placeholder="#10">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rank Label</label>
+        <input type="text" id="set-rank-label" placeholder="World Rank · Speed Kills">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tagline</label>
+        <textarea id="set-tagline" rows="3"></textarea>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+        <button onclick="saveSettings()" class="btn btn-primary">Save</button>
+        <button onclick="closeSettings()" class="btn btn-outline">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <!-- PROGRESSION -->
   <section class="section">
@@ -74,7 +133,7 @@
         <h2>The Council</h2>
       </div>
     </div>
-    <div id="officers-list" style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:stretch;">
+    <div class="officers-grid" id="officers-list">
       <div class="empty">Loading…</div>
     </div>
   </section>
@@ -88,9 +147,28 @@
   await loadSession();
   renderNav('home');
 
+  // Hide login btn if already logged in
+  if (isLoggedIn()) {
+    document.getElementById('login-btn').textContent = 'Dashboard';
+    document.getElementById('login-btn').href = 'dashboard.html';
+  }
+
+  // Load site settings (rank, tagline)
+  const { data: settings } = await sb.from('site_settings').select('*');
+  const s = {};
+  (settings || []).forEach(r => s[r.key] = r.value);
+
+  document.getElementById('hero-rank').textContent    = s.world_rank   || '#10';
+  document.getElementById('hero-tagline').textContent = s.hero_tagline || "Speed-first raiding guild. Top-10 world speed kills. We don't farm — we improve.";
+  document.getElementById('rank-label').textContent   = s.rank_label   || 'World Rank · Speed Kills';
+
+  if (isOfficer()) {
+    document.getElementById('rank-edit-btn').style.display = 'block';
+  }
+
   // Progression
   const { data: tiers } = await sb.from('progression')
-    .select('id, tier, raid_name, display_order, bosses(id,name,kill_time,display_order)')
+    .select('id,tier,raid_name,display_order,bosses(id,name,kill_time,display_order)')
     .order('display_order');
 
   const pg = document.getElementById('prog-grid');
@@ -98,34 +176,31 @@
     pg.innerHTML = '<div class="empty">No progression data yet.</div>';
   } else {
     pg.innerHTML = tiers.map(t => {
-      const bosses = (t.bosses || []).sort((a,b) => a.display_order - b.display_order);
-      const cleared = bosses.filter(b => b.kill_time && b.kill_time !== 'in prog').length;
+      const bosses = (t.bosses||[]).sort((a,b)=>a.display_order-b.display_order);
+      const cleared = bosses.filter(b=>b.kill_time).length;
       const pct = bosses.length ? Math.round((cleared/bosses.length)*100) : 0;
       return `<div class="card">
         <div class="label" style="margin-bottom:0.3rem;">${esc(t.tier)}</div>
         <h3 style="margin-bottom:1rem;">${esc(t.raid_name)}</h3>
-        <div>
-          ${bosses.map(b => `
-            <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
-              <span style="color:var(--bone);">${esc(b.name)}</span>
-              <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:${b.kill_time && b.kill_time!=='in prog'?'var(--accent)':'var(--dim)'};">${esc(b.kill_time||'—')}</span>
-            </div>`).join('')}
+        <div>${bosses.map(b=>`
+          <div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
+            <span style="color:var(--bone);">${esc(b.name)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:${b.kill_time?'var(--accent)':'var(--dim)'};">${esc(b.kill_time||'—')}</span>
+          </div>`).join('')}
         </div>
         <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
-        <div style="display:flex;justify-content:space-between;margin-top:0.4rem;">
-          <span class="label">${cleared}/${bosses.length} bosses</span>
-        </div>
+        <div style="margin-top:0.4rem;"><span class="label">${cleared}/${bosses.length} bosses</span></div>
       </div>`;
     }).join('');
   }
 
   // News
-  const { data: news } = await sb.from('news').select('*').order('created_at', {ascending:false}).limit(6);
+  const { data: news } = await sb.from('news').select('*').order('created_at',{ascending:false}).limit(6);
   const nl = document.getElementById('news-list');
-  if (!news || !news.length) {
+  if (!news||!news.length) {
     nl.innerHTML = '<div class="empty">No news yet.</div>';
   } else {
-    nl.innerHTML = news.map(n => `
+    nl.innerHTML = news.map(n=>`
       <div class="card card-accent">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.5rem;">
           <h3>${esc(n.title)}</h3>
@@ -138,10 +213,10 @@
   // Recruitment
   const { data: rec } = await sb.from('recruitment').select('*').order('priority').order('created_at');
   const rl = document.getElementById('recruit-list');
-  if (!rec || !rec.length) {
+  if (!rec||!rec.length) {
     rl.innerHTML = '<div class="empty">No open spots listed. Exceptional players always considered — <a href="apply.html">apply anyway</a>.</div>';
   } else {
-    rl.innerHTML = rec.map(r => `
+    rl.innerHTML = rec.map(r=>`
       <div class="row" style="justify-content:space-between;">
         <div>
           <div style="color:var(--bone);font-weight:500;">${esc(r.class_name)}</div>
@@ -154,17 +229,59 @@
   // Officers
   const { data: offs } = await sb.from('officers').select('*').order('display_order');
   const ol = document.getElementById('officers-list');
-  if (!offs || !offs.length) {
+  if (!offs||!offs.length) {
     ol.innerHTML = '<div class="empty">Leadership info coming soon.</div>';
   } else {
-    ol.innerHTML = offs.map(o => `
-      <div class="card" style="text-align:center;padding:1.5rem 1rem;width:200px;flex:0 0 200px;min-height:110px;">
-        <div style="font-size:0.9rem;font-weight:500;color:var(--white);margin-bottom:0.2rem;">${esc(o.name)}</div>
+    ol.innerHTML = offs.map(o=>`
+      <div class="officer-card">
+        <div style="font-size:0.9rem;font-weight:500;color:var(--white);margin-bottom:0.3rem;">${esc(o.name)}</div>
         <div class="label label-accent">${esc(o.title)}</div>
-        ${o.class_spec ? `<div style="color:var(--dim);font-size:0.82rem;margin-top:0.4rem;">${esc(o.class_spec)}</div>` : ''}
+        ${o.class_spec?`<div style="color:var(--dim);font-size:0.8rem;margin-top:0.4rem;">${esc(o.class_spec)}</div>`:''}
       </div>`).join('');
   }
 })();
+
+// Settings modal
+async function editSettings() {
+  const { data } = await sb.from('site_settings').select('*');
+  const s = {};
+  (data||[]).forEach(r => s[r.key]=r.value);
+  document.getElementById('set-rank').value       = s.world_rank||'#10';
+  document.getElementById('set-rank-label').value = s.rank_label||'World Rank · Speed Kills';
+  document.getElementById('set-tagline').value    = s.hero_tagline||'';
+  document.getElementById('settings-modal').style.display = 'flex';
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').style.display = 'none';
+}
+
+async function saveSettings() {
+  const rank      = document.getElementById('set-rank').value.trim();
+  const rankLabel = document.getElementById('set-rank-label').value.trim();
+  const tagline   = document.getElementById('set-tagline').value.trim();
+
+  const updates = [
+    { key:'world_rank',   value: rank      || '#10' },
+    { key:'rank_label',   value: rankLabel || 'World Rank · Speed Kills' },
+    { key:'hero_tagline', value: tagline   || '' },
+  ];
+
+  for (const u of updates) {
+    await sb.from('site_settings').upsert(u, { onConflict:'key' });
+  }
+
+  document.getElementById('hero-rank').textContent    = rank;
+  document.getElementById('rank-label').textContent   = rankLabel;
+  document.getElementById('hero-tagline').textContent = tagline;
+  closeSettings();
+  toast('Saved.', 'success');
+}
+
+// Close modal on background click
+document.getElementById('settings-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
 </script>
 </body>
 </html>

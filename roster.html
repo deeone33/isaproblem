@@ -19,7 +19,7 @@
     <div class="section-head">
       <h2>Officers</h2>
     </div>
-    <div id="officers-grid" style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:2.5rem;">
+    <div id="officers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,200px);gap:0.6rem;margin-bottom:2.5rem;">
       <div class="empty">Loading…</div>
     </div>
   </div>
@@ -45,7 +45,7 @@
   const og = document.getElementById('officers-grid');
   og.innerHTML = !offs?.length ? '<div class="empty">No officers listed.</div>' :
     offs.map(o => `
-      <div class="card" style="text-align:center;padding:1.5rem 1rem;width:200px;flex:0 0 200px;min-height:110px;">
+      <div style="width:200px;min-height:110px;padding:1.5rem 1rem;text-align:center;background:var(--surface);border:1px solid var(--border);box-sizing:border-box;">
         <div style="color:var(--white);font-weight:500;margin-bottom:0.2rem;">${esc(o.name)}</div>
         <div class="label label-accent" style="margin-bottom:${o.class_spec?'0.3rem':'0'}">${esc(o.title)}</div>
         ${o.class_spec ? `<div style="color:var(--dim);font-size:0.8rem;">${esc(o.class_spec)}</div>` : ''}
