@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Application Form Editor — Is a Problem</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topnav" id="topnav"></header>
+
+<div class="page-narrow">
+  <a href="dashboard.html" class="back">Dashboard</a>
+  <div class="label" style="margin-bottom:0.5rem;">Officer Tools</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:0.5rem;">
+    <h1>Application Form</h1>
+    <div style="display:flex;gap:0.5rem;">
+      <a href="apply.html" target="_blank" class="btn btn-outline btn-sm">Preview Form →</a>
+      <button onclick="toggleAddForm()" class="btn btn-primary">+ Add Question</button>
+    </div>
+  </div>
+  <p style="color:var(--dim);margin-bottom:2rem;font-size:0.85rem;">
+    Edit question labels, placeholder text, and toggle questions on or off. Disabled questions are hidden from applicants but not deleted.
+  </p>
+
+  <!-- ADD NEW QUESTION -->
+  <div id="add-form" class="card" style="display:none;margin-bottom:1.5rem;border-color:var(--accent);">
+    <h3 style="margin-bottom:1rem;">New Question</h3>
+    <div class="col-2">
+      <div class="form-group">
+        <label class="form-label">Question Label *</label>
+        <input type="text" id="new-label" placeholder="e.g. Previous guilds">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Field Type</label>
+        <select id="new-type">
+          <option value="text">Short text</option>
+          <option value="textarea" selected>Long text (textarea)</option>
+          <option value="url">URL</option>
+          <option value="number">Number</option>
+          <option value="email">Email</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Placeholder text <span style="color:var(--border);font-size:0.7rem;letter-spacing:0;">(shown greyed out inside the field)</span></label>
+      <input type="text" id="new-placeholder" placeholder="e.g. Name the guilds you've raided with seriously…">
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--dim);">
+        <input type="checkbox" id="new-required" style="width:16px;height:16px;accent-color:var(--accent);"> Required
+      </label>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+      <button onclick="addField()" class="btn btn-primary btn-sm">Add Question</button>
+      <button onclick="toggleAddForm()" class="btn btn-outline btn-sm">Cancel</button>
+    </div>
+  </div>
+
+  <!-- FIELDS LIST -->
+  <div id="fields-list"><div class="empty">Loading…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+(async () => {
+  if (!(await requireOfficer())) return;
+  renderNav('dashboard');
+  await loadFields();
+})();
+
+async function loadFields() {
+  const { data } = await sb.from('form_fields').select('*').order('display_order');
+  const el = document.getElementById('fields-list');
+  if (!data?.length) { el.innerHTML = '<div class="empty">No fields yet.</div>'; return; }
+
+  el.innerHTML = data.map((f, i) => `
+    <div class="card" style="margin-bottom:0.6rem;opacity:${f.enabled ? 1 : 0.45};" id="fcard-${f.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+
+          <!-- Label -->
+          <div class="form-group" style="margin-bottom:0.6rem;">
+            <label class="form-label">Label</label>
+            <input type="text" id="label-${f.id}" value="${esc(f.label)}"
+              onblur="saveField('${f.id}')"
+              onkeydown="if(event.key==='Enter')this.blur()">
+          </div>
+
+          <!-- Placeholder -->
+          <div class="form-group" style="margin-bottom:0.6rem;">
+            <label class="form-label">Placeholder</label>
+            <input type="text" id="placeholder-${f.id}" value="${esc(f.placeholder||'')}"
+              onblur="saveField('${f.id}')"
+              onkeydown="if(event.key==='Enter')this.blur()"
+              placeholder="(none)">
+          </div>
+
+          <!-- Type + Required -->
+          <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+            <div>
+              <label class="form-label">Type</label>
+              <select id="type-${f.id}" onchange="saveField('${f.id}')"
+                style="width:auto;padding:0.4rem 0.6rem;font-size:0.82rem;">
+                <option value="text"     ${f.field_type==='text'    ?'selected':''}>Short text</option>
+                <option value="textarea" ${f.field_type==='textarea'?'selected':''}>Long text</option>
+                <option value="url"      ${f.field_type==='url'     ?'selected':''}>URL</option>
+                <option value="number"   ${f.field_type==='number'  ?'selected':''}>Number</option>
+                <option value="email"    ${f.field_type==='email'   ?'selected':''}>Email</option>
+              </select>
+            </div>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;margin-top:1.2rem;"
+              class="form-label">
+              <input type="checkbox" id="req-${f.id}" ${f.required?'checked':''}
+                onchange="saveField('${f.id}')"
+                style="width:14px;height:14px;accent-color:var(--accent);">
+              Required
+            </label>
+          </div>
+        </div>
+
+        <!-- Right side controls -->
+        <div style="display:flex;flex-direction:column;gap:0.4rem;align-items:flex-end;padding-top:0.2rem;">
+          <!-- Enable / Disable toggle -->
+          <button onclick="toggleField('${f.id}',${!f.enabled})" class="btn ${f.enabled ? 'btn-outline' : 'btn-ok'} btn-sm">
+            ${f.enabled ? 'Disable' : 'Enable'}
+          </button>
+          <!-- Move up/down -->
+          <div style="display:flex;gap:0.3rem;">
+            <button onclick="moveField('${f.id}',${f.display_order},'up')" class="btn btn-outline btn-sm" ${i===0?'disabled':''}>↑</button>
+            <button onclick="moveField('${f.id}',${f.display_order},'down')" class="btn btn-outline btn-sm" ${i===data.length-1?'disabled':''}>↓</button>
+          </div>
+          <!-- Delete (only for custom fields — not built-in ones) -->
+          ${!['char_name','discord_tag','char_class','char_spec','age','logs_url','experience','why_join','anything_else'].includes(f.field_key) ? `
+            <button onclick="deleteField('${f.id}')" class="btn btn-danger btn-sm">Delete</button>` : ''}
+          <span class="label" style="font-size:0.6rem;">${esc(f.field_key)}</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function saveField(id) {
+  const label       = document.getElementById(`label-${id}`)?.value.trim();
+  const placeholder = document.getElementById(`placeholder-${id}`)?.value.trim() || null;
+  const field_type  = document.getElementById(`type-${id}`)?.value;
+  const required    = document.getElementById(`req-${id}`)?.checked;
+  if (!label) return;
+
+  const { error } = await sb.from('form_fields')
+    .update({ label, placeholder, field_type, required })
+    .eq('id', id);
+  if (error) toast(error.message, 'error');
+  else toast('Saved.', 'success');
+}
+
+async function toggleField(id, enabled) {
+  await sb.from('form_fields').update({ enabled }).eq('id', id);
+  toast(enabled ? 'Question enabled.' : 'Question disabled.', 'success');
+  await loadFields();
+}
+
+async function moveField(id, order, dir) {
+  if (dir === 'up') {
+    const { data: above } = await sb.from('form_fields')
+      .select('id,display_order').lt('display_order', order)
+      .order('display_order', {ascending:false}).limit(1);
+    if (!above?.length) return;
+    await sb.from('form_fields').update({ display_order: order }).eq('id', above[0].id);
+    await sb.from('form_fields').update({ display_order: above[0].display_order }).eq('id', id);
+  } else {
+    const { data: below } = await sb.from('form_fields')
+      .select('id,display_order').gt('display_order', order)
+      .order('display_order', {ascending:true}).limit(1);
+    if (!below?.length) return;
+    await sb.from('form_fields').update({ display_order: order }).eq('id', below[0].id);
+    await sb.from('form_fields').update({ display_order: below[0].display_order }).eq('id', id);
+  }
+  await loadFields();
+}
+
+async function deleteField(id) {
+  if (!confirm('Delete this question? This cannot be undone.')) return;
+  await sb.from('form_fields').delete().eq('id', id);
+  toast('Deleted.', 'success');
+  await loadFields();
+}
+
+async function addField() {
+  const label       = document.getElementById('new-label').value.trim();
+  const placeholder = document.getElementById('new-placeholder').value.trim() || null;
+  const field_type  = document.getElementById('new-type').value;
+  const required    = document.getElementById('new-required').checked;
+
+  if (!label) { toast('Label required.', 'error'); return; }
+
+  // Generate a field_key from the label
+  const field_key = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30) + '_' + Date.now().toString(36);
+
+  const { data: ex } = await sb.from('form_fields')
+    .select('display_order').order('display_order', {ascending:false}).limit(1);
+  const display_order = (ex?.[0]?.display_order || 0) + 1;
+
+  const { error } = await sb.from('form_fields')
+    .insert({ field_key, label, placeholder, field_type, required, enabled: true, display_order });
+
+  if (error) { toast(error.message, 'error'); return; }
+
+  document.getElementById('new-label').value = '';
+  document.getElementById('new-placeholder').value = '';
+  document.getElementById('new-required').checked = false;
+  toggleAddForm();
+  toast('Question added.', 'success');
+  await loadFields();
+}
+
+function toggleAddForm() {
+  const f = document.getElementById('add-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>

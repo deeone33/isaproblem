@@ -14,64 +14,13 @@
   <a href="index.html" class="back">Home</a>
   <div class="label" style="margin-bottom:0.5rem;">Trial Application</div>
   <h1 style="margin-bottom:0.5rem;">Apply</h1>
-  <p style="color:var(--dim);margin-bottom:2.5rem;">Officers review within 48 hours. You'll be notified here if you login with Discord — or we'll reach out to you directly.</p>
+  <p style="color:var(--dim);margin-bottom:2.5rem;">Officers review within 48 hours. You'll be notified here if you login with Discord — or we'll reach out directly.</p>
 
   <form id="apply-form" class="card" style="padding:2rem;">
-
-    <div class="col-2">
-      <div class="form-group">
-        <label class="form-label" for="char_name">Character Name *</label>
-        <input type="text" id="char_name" required placeholder="Edenrath">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="discord_tag">Discord Tag *</label>
-        <input type="text" id="discord_tag" required placeholder="username#0000">
-      </div>
-    </div>
-
-    <div class="col-3">
-      <div class="form-group">
-        <label class="form-label" for="char_class">Class *</label>
-        <input type="text" id="char_class" required placeholder="Rogue">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="char_spec">Spec *</label>
-        <input type="text" id="char_spec" required placeholder="Combat">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="age">Age <span class="optional">(optional)</span></label>
-        <input type="number" id="age" min="13" max="80" placeholder="—">
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="logs_url">Warcraft Logs URL</label>
-      <input type="url" id="logs_url" placeholder="https://www.warcraftlogs.com/character/eu/spineshatter/...">
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="experience">Raiding Experience *</label>
-      <textarea id="experience" rows="4" required placeholder="Previous guilds, notable kills, years of experience…"></textarea>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="expectations">What are your expectations from the guild? *</label>
-      <textarea id="expectations" rows="3" required placeholder="What do you want from being in a top-10 guild?"></textarea>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="why_join">Why Is a Problem? *</label>
-      <textarea id="why_join" rows="3" required placeholder="Why us specifically?"></textarea>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="anything_else">Anything else? <span class="optional">(optional)</span></label>
-      <textarea id="anything_else" rows="2" placeholder="Alts, availability notes, anything you want us to know…"></textarea>
-    </div>
-
-    <div style="display:flex;gap:1rem;margin-top:0.5rem;">
+    <div id="fields-container"><div class="empty">Loading form…</div></div>
+    <div style="display:flex;gap:1rem;margin-top:1.5rem;">
       <a href="index.html" class="btn btn-outline">Cancel</a>
-      <button type="submit" class="btn btn-primary">Submit Application →</button>
+      <button type="submit" class="btn btn-primary" id="submit-btn" disabled>Submit Application →</button>
     </div>
   </form>
 </div>
@@ -79,30 +28,113 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 <script>
+let formFields = [];
+
+// Fields that share a row (col-2 layout)
+const ROW_PAIRS = [
+  ['char_name', 'discord_tag'],
+  ['char_class', 'char_spec'],
+];
+
 (async () => {
   await loadSession();
   renderNav('apply');
+  await loadForm();
 })();
+
+async function loadForm() {
+  const { data, error } = await sb.from('form_fields')
+    .select('*')
+    .eq('enabled', true)
+    .order('display_order');
+
+  if (error || !data?.length) {
+    document.getElementById('fields-container').innerHTML = '<div class="empty">Could not load form. Try refreshing.</div>';
+    return;
+  }
+
+  formFields = data;
+  renderForm(data);
+  document.getElementById('submit-btn').disabled = false;
+}
+
+function renderForm(fields) {
+  const container = document.getElementById('fields-container');
+  const rendered = new Set();
+  let html = '';
+
+  for (const field of fields) {
+    if (rendered.has(field.field_key)) continue;
+
+    // Check if this field is part of a pair
+    const pair = ROW_PAIRS.find(p => p[0] === field.field_key);
+    if (pair) {
+      const f2 = fields.find(f => f.field_key === pair[1]);
+      if (f2) {
+        html += `<div class="col-2" style="margin-bottom:1.2rem;">
+          ${fieldHtml(field)}
+          ${fieldHtml(f2)}
+        </div>`;
+        rendered.add(field.field_key);
+        rendered.add(f2.field_key);
+        continue;
+      }
+    }
+
+    html += `<div class="form-group">${fieldHtml(field)}</div>`;
+    rendered.add(field.field_key);
+  }
+
+  container.innerHTML = html;
+}
+
+function fieldHtml(f) {
+  const req = f.required ? ' *' : '';
+  const reqAttr = f.required ? 'required' : '';
+  const placeholder = f.placeholder || '';
+  const label = `<label class="form-label" for="field-${f.field_key}">${esc(f.label)}${req}</label>`;
+
+  if (f.field_type === 'textarea') {
+    return `${label}<textarea id="field-${f.field_key}" name="${f.field_key}" rows="4" ${reqAttr} placeholder="${esc(placeholder)}"></textarea>`;
+  }
+  return `${label}<input type="${f.field_type}" id="field-${f.field_key}" name="${f.field_key}" ${reqAttr} placeholder="${esc(placeholder)}"${f.field_key === 'age' ? ' min="13" max="80"' : ''}>`;
+}
 
 document.getElementById('apply-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const btn = e.target.querySelector('[type=submit]');
+  const btn = document.getElementById('submit-btn');
   btn.disabled = true;
   btn.textContent = 'Submitting…';
 
-  const payload = {
-    applicant_name:  document.getElementById('char_name').value.trim(),
-    discord_tag:     document.getElementById('discord_tag').value.trim(),
-    character_class: document.getElementById('char_class').value.trim(),
-    character_spec:  document.getElementById('char_spec').value.trim(),
-    age:             document.getElementById('age').value || null,
-    logs_url:        document.getElementById('logs_url').value.trim() || null,
-    experience:      document.getElementById('experience').value.trim(),
-    expectations:    document.getElementById('expectations').value.trim(),
-    why_join:        document.getElementById('why_join').value.trim(),
-    anything_else:   document.getElementById('anything_else').value.trim() || null,
-    user_id:         currentUser?.id || null,
-  };
+  // Build payload from dynamic fields
+  const payload = { user_id: currentUser?.id || null };
+  for (const field of formFields) {
+    const el = document.getElementById('field-' + field.field_key);
+    if (!el) continue;
+    const val = el.value.trim();
+    // Map field keys to DB column names
+    const colMap = {
+      char_name:    'applicant_name',
+      discord_tag:  'discord_tag',
+      char_class:   'character_class',
+      char_spec:    'character_spec',
+      age:          'age',
+      logs_url:     'logs_url',
+      experience:   'experience',
+      why_join:     'why_join',
+      anything_else:'anything_else',
+    };
+    const col = colMap[field.field_key] || field.field_key;
+    payload[col] = val || null;
+  }
+
+  // Also store the custom field data as JSON for any non-standard fields
+  const standardKeys = ['applicant_name','discord_tag','character_class','character_spec','age','logs_url','experience','why_join','anything_else','user_id'];
+  const extra = {};
+  for (const [k, v] of Object.entries(payload)) {
+    if (!standardKeys.includes(k) && v) extra[k] = v;
+  }
+  if (Object.keys(extra).length) payload.extra_fields = JSON.stringify(extra);
 
   const { error } = await sb.from('applications').insert(payload);
   if (error) {
@@ -112,15 +144,13 @@ document.getElementById('apply-form').addEventListener('submit', async (e) => {
     return;
   }
 
-  // Replace form with confirmation
   document.getElementById('apply-form').innerHTML = `
     <div style="text-align:center;padding:2rem 0;">
-      <div style="font-size:2rem;margin-bottom:1rem;">✓</div>
+      <div style="font-size:2.5rem;margin-bottom:1rem;color:var(--accent);">✓</div>
       <h2 style="margin-bottom:0.8rem;">Application Submitted</h2>
-      <p style="color:var(--dim);margin-bottom:2rem;">Officers will review your application within 48 hours. If you log in with Discord, you can track the status on your dashboard.</p>
+      <p style="color:var(--dim);margin-bottom:2rem;">Officers will review your application within 48 hours. Log in with Discord to track your status.</p>
       <a href="index.html" class="btn btn-outline">Back to Home</a>
-    </div>
-  `;
+    </div>`;
 });
 </script>
 </body>
